@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<title>Teste - Message API</title>
+<style>
+  body { font-family: sans-serif; max-width: 480px; margin: 40px auto; }
+  #log { border: 1px solid #ccc; height: 260px; overflow-y: auto; padding: 8px; margin-bottom: 10px; }
+  #log div { margin-bottom: 6px; }
+  input, button { padding: 8px; margin-top: 4px; width: 100%; box-sizing: border-box; }
+</style>
+</head>
+<body>
+  <h2>Teste da Message API</h2>
+
+  <label>Meu usuário:</label>
+  <input id="me" placeholder="ex: joao" />
+  <button onclick="register()">Conectar</button>
+
+  <div id="log"></div>
+
+  <label>Enviar para:</label>
+  <input id="to" placeholder="ex: maria" />
+  <label>Mensagem:</label>
+  <input id="content" placeholder="Digite sua mensagem" />
+  <button onclick="send()">Enviar</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const log = (text) => {
+      const el = document.getElementById('log');
+      const div = document.createElement('div');
+      div.textContent = text;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    };
+
+    socket.on('connect', () => log('Conectado ao servidor (socket ' + socket.id + ')'));
+
+    socket.on('message', (msg) => {
+      log(`📩 ${msg.from_user} -> ${msg.to_user}: ${msg.content}`);
+    });
+
+    function register() {
+      const me = document.getElementById('me').value.trim();
+      if (!me) return alert('Digite seu nome de usuário');
+      socket.emit('register', me);
+      log(`Registrado como "${me}"`);
+    }
+
+    function send() {
+      const from = document.getElementById('me').value.trim();
+      const to = document.getElementById('to').value.trim();
+      const content = document.getElementById('content').value.trim();
+      if (!from || !to || !content) return alert('Preencha todos os campos');
+
+      // Envio via REST (poderia ser via socket.emit('sendMessage', {...}) também)
+      fetch('/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to, content }),
+      })
+        .then((r) => r.json())
+        .then((data) => log(`✅ Enviado: ${data.content}`));
+
+      document.getElementById('content').value = '';
+    }
+  </script>
+</body>
+</html>
