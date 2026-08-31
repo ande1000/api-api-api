@@ -1,0 +1,14 @@
+{
+  "name": "message-api",
+  "version": "1.0.0",
+  "description": "API de mensagens em tempo real (sem chave de API), com Express + Socket.IO + SQLite",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
