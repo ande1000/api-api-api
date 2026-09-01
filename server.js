@@ -257,9 +257,9 @@ app.get('/online', (req, res) => {
   res.json(Array.from(onlineUsers.keys()));
 });
 
-// Qualquer rota que não seja da API cai na tela de login (single-page app simples)
+// Qualquer rota que não seja da API cai na tela principal do whats web app
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'whatsweb.html'));
 });
 
 const PORT = process.env.PORT || 3000;
