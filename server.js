@@ -28,6 +28,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    avatar TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -41,8 +42,16 @@ db.exec(`
   );
 `);
 
-const insertUser = db.prepare(`INSERT INTO users (username, password_hash) VALUES (?, ?)`);
+// Se o banco já existia de uma versão anterior (sem a coluna avatar), adiciona agora.
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`);
+} catch (err) {
+  // Coluna já existe — tudo bem, ignora.
+}
+
+const insertUser = db.prepare(`INSERT INTO users (username, password_hash, avatar) VALUES (?, ?, ?)`);
 const findUser = db.prepare(`SELECT * FROM users WHERE username = ?`);
+const updateAvatar = db.prepare(`UPDATE users SET avatar = ? WHERE username = ?`);
 
 const insertMessage = db.prepare(`
   INSERT INTO messages (from_user, to_user, content, delivered)
@@ -61,6 +70,10 @@ const getConversationPartners = db.prepare(`
   SELECT DISTINCT CASE WHEN from_user = ? THEN to_user ELSE from_user END AS other_user
   FROM messages
   WHERE from_user = ? OR to_user = ?
+`);
+const deleteConversation = db.prepare(`
+  DELETE FROM messages
+  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
 `);
 
 // ---------------------------------------------------------------------------
@@ -117,6 +130,7 @@ app.post('/api/register', (req, res) => {
 // (não há como logar de novo num outro aparelho digitando a senha).
 app.post('/api/claim', (req, res) => {
   const username = normalizeUsername(req.body.username);
+  const avatar = typeof req.body.avatar === 'string' ? req.body.avatar : null;
   if (!username) {
     return res.status(400).json({ error: 'Informe um nome de usuário' });
   }
@@ -127,10 +141,10 @@ app.post('/api/claim', (req, res) => {
   // Senha aleatória interna só para satisfazer o banco — o usuário nunca a vê nem a usa.
   const randomPassword = Math.random().toString(36).slice(2) + Date.now();
   const passwordHash = bcrypt.hashSync(randomPassword, 10);
-  insertUser.run(username, passwordHash);
+  insertUser.run(username, passwordHash, avatar);
 
   const token = createToken(username);
-  res.status(201).json({ token, username });
+  res.status(201).json({ token, username, avatar });
 });
 
 // Verifica se um nome de usuário já existe no servidor — usado para validar
@@ -139,6 +153,19 @@ app.get('/api/exists/:username', (req, res) => {
   const username = normalizeUsername(req.params.username);
   const user = findUser.get(username);
   res.json({ exists: !!user });
+});
+
+// Devolve os dados públicos de um usuário: nome, foto de perfil e se está online agora.
+// Usado para mostrar a foto/status na lista de contatos e no topo da conversa.
+app.get('/api/user/:username', (req, res) => {
+  const username = normalizeUsername(req.params.username);
+  const user = findUser.get(username);
+  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+  res.json({
+    username: user.username,
+    avatar: user.avatar || null,
+    online: onlineUsers.has(username),
+  });
 });
 
 // Login: POST /api/login  { username, password }
@@ -200,6 +227,7 @@ io.on('connection', (socket) => {
   const username = socket.username;
   onlineUsers.set(username, socket.id);
   console.log(`[online] ${username}`);
+  io.emit('presence', { username, online: true });
 
   // Entrega mensagens que chegaram enquanto o usuário estava offline
   const pending = getPending.all(username);
@@ -219,8 +247,27 @@ io.on('connection', (socket) => {
     if (onlineUsers.get(username) === socket.id) {
       onlineUsers.delete(username);
       console.log(`[offline] ${username}`);
+      io.emit('presence', { username, online: false });
     }
   });
+
+  // --- Sinalização de chamada de voz (WebRTC) ---
+  // O servidor só repassa as mensagens entre os dois usuários; o áudio em si
+  // não passa por aqui, vai direto de um aparelho para o outro.
+  function relayToUser(event, to, payload) {
+    const targetSocketId = onlineUsers.get(normalizeUsername(to));
+    if (targetSocketId) {
+      io.to(targetSocketId).emit(event, { from: username, ...payload });
+    } else {
+      socket.emit('call:unavailable', { to: normalizeUsername(to) });
+    }
+  }
+
+  socket.on('call:offer', ({ to, offer }) => relayToUser('call:offer', to, { offer }));
+  socket.on('call:answer', ({ to, answer }) => relayToUser('call:answer', to, { answer }));
+  socket.on('call:ice-candidate', ({ to, candidate }) => relayToUser('call:ice-candidate', to, { candidate }));
+  socket.on('call:end', ({ to }) => relayToUser('call:end', to, {}));
+  socket.on('call:reject', ({ to }) => relayToUser('call:reject', to, {}));
 });
 
 // ---------------------------------------------------------------------------
@@ -244,6 +291,13 @@ app.get('/messages/:otherUser', requireAuth, (req, res) => {
   const otherUser = normalizeUsername(req.params.otherUser);
   const history = getHistory.all(req.username, otherUser, otherUser, req.username);
   res.json(history);
+});
+
+// Apaga o histórico de conversa com um contato (para os dois lados)
+app.delete('/messages/:otherUser', requireAuth, (req, res) => {
+  const otherUser = normalizeUsername(req.params.otherUser);
+  deleteConversation.run(req.username, otherUser, otherUser, req.username);
+  res.json({ ok: true });
 });
 
 // Lista de conversas do usuário logado: GET /conversations
