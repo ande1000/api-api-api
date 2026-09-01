@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>whats web app</title>
+<style>
+  :root {
+    --blue: #1FA6E0;
+    --green: #1FD65F;
+    --green-dark: #17A84B;
+    --red: #E5352B;
+    --black: #0B0B0B;
+    --grey-dark: #4A4A4A;
+    --grey-bubble: #4D4D4D;
+    --white: #FFFFFF;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: var(--black);
+    overflow: hidden;
+  }
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+  }
+  .screen.active { display: flex; }
+
+  /* ---------- Splash ---------- */
+  #screen-splash {
+    background: var(--black);
+    align-items: center;
+    justify-content: space-between;
+    padding: 60px 24px;
+    text-align: center;
+  }
+  #screen-splash .title-block { margin-top: 90px; }
+  #screen-splash h1 {
+    color: var(--white);
+    font-size: 1.9rem;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  #screen-splash .sub {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .round-btn {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: var(--green);
+    color: var(--red);
+    font-weight: 800;
+    font-size: 1.15rem;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 40px;
+  }
+  .round-btn:active { background: var(--green-dark); }
+
+  /* ---------- Criar usuário ---------- */
+  #screen-create-user {
+    background: var(--black);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 22px;
+  }
+  #screen-create-user h1 {
+    color: var(--white);
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+  }
+  .field {
+    width: 100%;
+    max-width: 320px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: none;
+    background: var(--white);
+    font-size: 1rem;
+  }
+  .field:focus { outline: 3px solid var(--blue); }
+  .btn-green {
+    background: var(--green);
+    color: #0B3D1E;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .btn-green:active { background: var(--green-dark); }
+  .error-text {
+    color: #FF8A80;
+    font-size: 0.85rem;
+    min-height: 18px;
+  }
+
+  /* ---------- Tela principal (lista de contatos) ---------- */
+  #screen-main { background: var(--black); }
+  .topbar {
+    background: var(--blue);
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar h1 {
+    color: var(--white);
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+  }
+  .topbar .logout-link {
+    color: rgba(255,255,255,0.85);
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .contact-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .contact-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    cursor: pointer;
+  }
+  .contact-row:active { background: #1a1a1a; }
+  .avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #0B3D1E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .contact-name {
+    color: var(--white);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .empty-contacts {
+    color: #888;
+    text-align: center;
+    padding: 60px 30px;
+    line-height: 1.6;
+    font-size: 0.95rem;
+  }
+  .fab {
+    position: absolute;
+    right: 22px;
+    bottom: 26px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #0B3D1E;
+    font-size: 1.8rem;
+    font-weight: 800;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    cursor: pointer;
+    line-height: 0;
+  }
+  .fab:active { background: var(--green-dark); }
+
+  /* ---------- Adicionar usuário ---------- */
+  #screen-add-user {
+    background: var(--grey-dark);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 20px;
+    position: relative;
+  }
+  #screen-add-user h1 {
+    color: var(--red);
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+  }
+  .back-arrow {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    color: var(--white);
+    font-size: 1.6rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .round-btn-sm {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #0B3D1E;
+    font-weight: 800;
+    font-size: 0.85rem;
+    border: none;
+    cursor: pointer;
+    line-height: 1.2;
+  }
+  .round-btn-sm:active { background: var(--green-dark); }
+
+  /* ---------- Conversa ---------- */
+  #screen-chat { background: var(--grey-dark); }
+  .chat-topbar {
+    background: var(--blue);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .chat-topbar .back-arrow { position: static; }
+  .chat-topbar h2 {
+    color: var(--white);
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin: 0;
+  }
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bubble-row { display: flex; }
+  .bubble-row.me { justify-content: flex-end; }
+  .bubble {
+    max-width: 72%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 0.96rem;
+    line-height: 1.4;
+    color: var(--white);
+  }
+  .bubble-row.them .bubble { background: var(--grey-bubble); border-bottom-left-radius: 3px; }
+  .bubble-row.me .bubble { background: var(--green-dark); border-bottom-right-radius: 3px; }
+  .bubble img { max-width: 100%; border-radius: 8px; display: block; }
+  .composer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: #3a3a3a;
+  }
+  .photo-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--red);
+    color: var(--white);
+    font-size: 1.4rem;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 0;
+  }
+  .composer input[type="text"] {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 22px;
+    border: none;
+    background: var(--white);
+    font-size: 0.95rem;
+  }
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #0B3D1E;
+    font-size: 1.2rem;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .send-btn:active { background: var(--green-dark); }
+</style>
+</head>
+<body>
+
+  <!-- TELA 1: Início -->
+  <div class="screen active" id="screen-splash">
+    <div class="title-block">
+      <h1>WHATS WEB APP</h1>
+      <p class="sub">SEU APLICATIVO DE CONVERSA</p>
+    </div>
+    <button class="round-btn" onclick="goTo('screen-create-user')">INICIA</button>
+  </div>
+
+  <!-- TELA 2: Criar usuário -->
+  <div class="screen" id="screen-create-user">
+    <h1>CRIAR USUARIO</h1>
+    <input class="field" id="create-username" placeholder="crei usuario" autocomplete="off" />
+    <p class="error-text" id="create-error"></p>
+    <button class="btn-green" onclick="createUser()">CRIAR</button>
+  </div>
+
+  <!-- TELA 3: Principal (lista de contatos) -->
+  <div class="screen" id="screen-main">
+    <div class="topbar">
+      <h1>whats web</h1>
+      <span class="logout-link" onclick="logout()">sair</span>
+    </div>
+    <div class="contact-list" id="contact-list"></div>
+    <button class="fab" onclick="goTo('screen-add-user')">+</button>
+  </div>
+
+  <!-- TELA 4: Adicionar usuário -->
+  <div class="screen" id="screen-add-user">
+    <button class="back-arrow" onclick="goTo('screen-main')">←</button>
+    <h1>adiciona usuario</h1>
+    <input class="field" id="add-username" placeholder="diginte o nome do usuario" autocomplete="off" />
+    <p class="error-text" id="add-error"></p>
+    <button class="round-btn-sm" onclick="addContact()">salvar<br/>usuario</button>
+  </div>
+
+  <!-- TELA 5: Conversa -->
+  <div class="screen" id="screen-chat">
+    <div class="chat-topbar">
+      <button class="back-arrow" onclick="goTo('screen-main')">←</button>
+      <h2 id="chat-contact-name"></h2>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="composer">
+      <button class="photo-btn" onclick="document.getElementById('photo-input').click()">+</button>
+      <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
+      <input type="text" id="message-input" placeholder="diginta sua mesagem aqui" autocomplete="off" />
+      <button class="send-btn" onclick="sendMessage()">✓</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const STORAGE_TOKEN = 'whatsweb_token';
+    const STORAGE_USERNAME = 'whatsweb_username';
+    const STORAGE_CONTACTS = 'whatsweb_contacts';
+
+    let token = localStorage.getItem(STORAGE_TOKEN);
+    let myUsername = localStorage.getItem(STORAGE_USERNAME);
+    let contacts = JSON.parse(localStorage.getItem(STORAGE_CONTACTS) || '[]');
+    let socket = null;
+    let currentChatUser = null;
+
+    function goTo(screenId) {
+      document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function normalize(name) {
+      return String(name || '').trim().toLowerCase();
+    }
+
+    function saveContacts() {
+      localStorage.setItem(STORAGE_CONTACTS, JSON.stringify(contacts));
+    }
+
+    // ---------- Tela 2: criar usuário ----------
+    async function createUser() {
+      const input = document.getElementById('create-username');
+      const errorEl = document.getElementById('create-error');
+      const username = normalize(input.value);
+      errorEl.textContent = '';
+
+      if (!username) {
+        errorEl.textContent = 'Digite um nome de usuário.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Não foi possível criar esse usuário.';
+          return;
+        }
+        token = data.token;
+        myUsername = data.username;
+        localStorage.setItem(STORAGE_TOKEN, token);
+        localStorage.setItem(STORAGE_USERNAME, myUsername);
+        connectSocket();
+        renderContacts();
+        goTo('screen-main');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem(STORAGE_TOKEN);
+      localStorage.removeItem(STORAGE_USERNAME);
+      localStorage.removeItem(STORAGE_CONTACTS);
+      if (socket) socket.disconnect();
+      token = null; myUsername = null; contacts = [];
+      goTo('screen-splash');
+    }
+
+    // ---------- Tela 3: lista de contatos ----------
+    function renderContacts() {
+      const list = document.getElementById('contact-list');
+      list.innerHTML = '';
+      if (contacts.length === 0) {
+        list.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.<br/>Toque no + para adicionar alguém pelo nome de usuário.</p>';
+        return;
+      }
+      contacts.forEach((user) => {
+        const row = document.createElement('div');
+        row.className = 'contact-row';
+        row.onclick = () => openChat(user);
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.textContent = user.charAt(0).toUpperCase();
+
+        const name = document.createElement('div');
+        name.className = 'contact-name';
+        name.textContent = user;
+
+        row.appendChild(avatar);
+        row.appendChild(name);
+        list.appendChild(row);
+      });
+    }
+
+    // ---------- Tela 4: adicionar usuário ----------
+    async function addContact() {
+      const input = document.getElementById('add-username');
+      const errorEl = document.getElementById('add-error');
+      const username = normalize(input.value);
+      errorEl.textContent = '';
+
+      if (!username) {
+        errorEl.textContent = 'Digite um nome de usuário.';
+        return;
+      }
+      if (username === myUsername) {
+        errorEl.textContent = 'Você não pode adicionar a si mesmo.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/exists/' + encodeURIComponent(username));
+        const data = await res.json();
+        if (!data.exists) {
+          errorEl.textContent = 'Esse usuário não existe. Peça pra pessoa criar o usuário dela primeiro.';
+          return;
+        }
+        if (!contacts.includes(username)) {
+          contacts.push(username);
+          saveContacts();
+          renderContacts();
+        }
+        input.value = '';
+        openChat(username);
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    // ---------- Tela 5: conversa ----------
+    async function openChat(user) {
+      currentChatUser = user;
+      document.getElementById('chat-contact-name').textContent = user;
+      document.getElementById('messages').innerHTML = '';
+      goTo('screen-chat');
+
+      try {
+        const res = await fetch('/messages/' + encodeURIComponent(user), {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const history = await res.json();
+        history.forEach(appendBubble);
+        scrollToBottom();
+      } catch (err) {
+        // segue sem histórico se der erro de rede
+      }
+    }
+
+    function appendBubble(msg) {
+      const messagesEl = document.getElementById('messages');
+      const row = document.createElement('div');
+      const mine = msg.from_user === myUsername;
+      row.className = 'bubble-row ' + (mine ? 'me' : 'them');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      if (typeof msg.content === 'string' && msg.content.startsWith('data:image')) {
+        const img = document.createElement('img');
+        img.src = msg.content;
+        bubble.appendChild(img);
+      } else {
+        bubble.textContent = msg.content;
+      }
+
+      row.appendChild(bubble);
+      messagesEl.appendChild(row);
+    }
+
+    function scrollToBottom() {
+      const messagesEl = document.getElementById('messages');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('message-input');
+      const content = input.value.trim();
+      if (!content || !currentChatUser || !socket) return;
+      socket.emit('sendMessage', { to: currentChatUser, content });
+      appendBubble({ from_user: myUsername, content });
+      scrollToBottom();
+      input.value = '';
+    }
+
+    document.getElementById('message-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // ---------- Envio de foto ----------
+    function sendPhoto(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file || !currentChatUser) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Redimensiona a imagem antes de enviar, para não ficar pesada demais
+          const maxWidth = 800;
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+          socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
+          appendBubble({ from_user: myUsername, content: dataUrl });
+          scrollToBottom();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ---------- WebSocket ----------
+    function connectSocket() {
+      socket = io({ auth: { token } });
+
+      socket.on('connect_error', (err) => {
+        if (err.message === 'Token inválido' || err.message === 'Token não fornecido') {
+          logout();
+        }
+      });
+
+      socket.on('message', (msg) => {
+        const otherUser = msg.from_user === myUsername ? msg.to_user : msg.from_user;
+        if (!contacts.includes(otherUser)) {
+          contacts.push(otherUser);
+          saveContacts();
+          renderContacts();
+        }
+        if (currentChatUser === otherUser) {
+          appendBubble(msg);
+          scrollToBottom();
+        }
+      });
+    }
+
+    // ---------- Inicialização ----------
+    if (token && myUsername) {
+      connectSocket();
+      renderContacts();
+      goTo('screen-main');
+    }
+  </script>
+</body>
+</html>
