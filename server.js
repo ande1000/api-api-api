@@ -248,7 +248,7 @@ function deliverMessage(from, to, content) {
     sendPushToUser(to, {
       type: 'message',
       title: from,
-      body: content.startsWith('data:image') ? '📷 Foto' : content,
+      body: content.startsWith('data:image') ? '📷 Foto' : content.startsWith('data:audio') ? '🎤 Áudio' : content,
     });
   }
 
