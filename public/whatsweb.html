@@ -133,22 +133,83 @@
   #screen-main { background: var(--black); }
   .topbar {
     background: var(--blue);
-    padding: 18px 20px;
+    padding: 10px 14px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
   }
-  .topbar h1 {
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+  .topbar-left .avatar { width: 40px; height: 40px; font-size: 1rem; flex-shrink: 0; }
+  .topbar-username {
+    background: rgba(255,255,255,0.92);
+    color: var(--red);
+    font-weight: 800;
+    font-size: 0.75rem;
+    border-radius: 14px;
+    padding: 5px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+  }
+  .topbar-title {
     color: var(--white);
-    font-size: 1.5rem;
+    font-size: 1.15rem;
     font-weight: 800;
     margin: 0;
+    text-align: center;
+    flex: 1.4;
+    letter-spacing: 0.5px;
+  }
+  .topbar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+  .settings-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--white);
+    padding: 0;
+    line-height: 1.1;
+  }
+  .settings-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .settings-icon {
+    background: rgba(255,255,255,0.35);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    margin-top: 2px;
   }
   .topbar .logout-link {
-    color: rgba(255,255,255,0.85);
-    font-size: 0.8rem;
+    color: var(--white);
+    font-size: 0.9rem;
+    font-weight: 800;
     text-decoration: underline;
     cursor: pointer;
+    margin-top: 2px;
   }
   .contact-list { flex: 1; overflow-y: auto; padding: 8px 0; }
   .contact-row {
@@ -273,6 +334,60 @@
     line-height: 1.2;
   }
   .round-btn-sm:active { background: var(--green-dark); }
+
+  /* ---------- Configurações / editar perfil ---------- */
+  #screen-settings {
+    background: var(--black);
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px 24px;
+    gap: 14px;
+    position: relative;
+    overflow-y: auto;
+  }
+  .settings-username-pill {
+    background: var(--white);
+    color: var(--red);
+    font-weight: 800;
+    font-size: 0.95rem;
+    border-radius: 16px;
+    padding: 8px 22px;
+    text-align: center;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .settings-avatar-big {
+    width: 110px;
+    height: 110px;
+    color: var(--red);
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .settings-heading {
+    color: var(--white);
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin: 8px 0 4px;
+  }
+  .settings-option-btn {
+    width: 100%;
+    max-width: 320px;
+    background: var(--white);
+    color: #333;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 16px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+  input.settings-option-btn {
+    font-weight: 400;
+    color: var(--black);
+  }
 
   /* ---------- Conversa ---------- */
   #screen-chat { background: var(--grey-dark); }
@@ -471,6 +586,34 @@
     align-items: center;
     justify-content: space-between;
     padding: 50px 24px 60px;
+    position: relative;
+  }
+  .call-video-wrap {
+    position: absolute;
+    inset: 0;
+    background: #111;
+  }
+  #remote-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #local-video {
+    position: absolute;
+    bottom: 140px;
+    right: 18px;
+    width: 100px;
+    height: 140px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 2px solid rgba(255,255,255,0.6);
+    background: #222;
+  }
+  #call-audio-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
   }
   .call-name-pill {
     background: var(--white);
@@ -484,6 +627,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    z-index: 1;
   }
   .call-avatar-big {
     width: 150px;
@@ -505,11 +649,14 @@
     font-size: 1rem;
     margin-top: 14px;
     text-align: center;
+    z-index: 1;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.7);
   }
   .call-controls-row {
     display: flex;
     gap: 30px;
     align-items: center;
+    z-index: 1;
   }
   .call-btn-round {
     width: 64px;
@@ -552,11 +699,34 @@
   <!-- TELA 3: Principal (lista de contatos) -->
   <div class="screen" id="screen-main">
     <div class="topbar">
-      <h1>whats web</h1>
-      <span class="logout-link" onclick="logout()">sair</span>
+      <div class="topbar-left" onclick="openSettings()">
+        <div class="avatar" id="my-avatar-topbar"></div>
+        <div class="topbar-username" id="my-username-topbar"></div>
+      </div>
+      <h1 class="topbar-title">WHATS WEB APP</h1>
+      <div class="topbar-right">
+        <button class="settings-btn" onclick="openSettings()" title="Ver perfil">
+          <span class="settings-label">VER PERFIL</span>
+          <span class="settings-icon">⚙</span>
+        </button>
+        <span class="logout-link" onclick="logout()">SAIR</span>
+      </div>
     </div>
     <div class="contact-list" id="contact-list"></div>
     <button class="fab" onclick="goTo('screen-add-user')">+</button>
+  </div>
+
+  <!-- TELA 7: Configurações / editar perfil -->
+  <div class="screen" id="screen-settings">
+    <button class="back-arrow" onclick="goTo('screen-main')">←</button>
+    <div class="settings-username-pill" id="settings-username-pill"></div>
+    <button class="photo-picker settings-avatar-big" id="settings-avatar-btn" onclick="document.getElementById('settings-avatar-input').click()"></button>
+    <input type="file" id="settings-avatar-input" accept="image/*" style="display:none" onchange="onSettingsAvatarSelected(event)" />
+    <h2 class="settings-heading">Editar perfil</h2>
+    <button class="settings-option-btn" onclick="document.getElementById('settings-avatar-input').click()">alterar foto do perfil</button>
+    <input class="field settings-option-btn" id="settings-username-input" placeholder="alterar usuario" autocomplete="off" />
+    <p class="error-text" id="settings-error"></p>
+    <button class="btn-green" onclick="saveSettings()">salva</button>
   </div>
 
   <!-- TELA 4: Adicionar usuário -->
@@ -579,7 +749,8 @@
           <div class="status" id="chat-contact-status">offline</div>
         </div>
       </div>
-      <button class="icon-btn chat-call-btn" onclick="startCall()" title="Ligar">☎</button>
+      <button class="icon-btn chat-call-btn" onclick="startCall('audio')" title="Ligar">☎</button>
+      <button class="icon-btn chat-call-btn" onclick="startCall('video')" title="Vídeo chamada">📹</button>
       <button class="icon-btn" onclick="toggleChatMenu()" title="Mais opções">⋮</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -605,10 +776,14 @@
     </div>
   </div>
 
-  <!-- TELA 6: Chamada de voz -->
+  <!-- TELA 6: Chamada de voz / vídeo -->
   <div class="screen" id="screen-call">
     <div class="call-name-pill" id="call-name-pill"></div>
-    <div>
+    <div class="call-video-wrap" id="call-video-wrap" style="display:none;">
+      <video id="remote-video" autoplay playsinline></video>
+      <video id="local-video" autoplay playsinline muted></video>
+    </div>
+    <div id="call-audio-visual">
       <div class="call-avatar-big" id="call-avatar-big"></div>
       <p class="call-status-text" id="call-status-text"></p>
     </div>
@@ -621,6 +796,7 @@
     </div>
     <div class="call-controls-row" id="call-controls-active" style="display:none;">
       <button class="call-btn-round mute" id="mute-btn" onclick="toggleMute()">🎤</button>
+      <button class="call-btn-round mute" id="camera-btn" onclick="toggleCamera()" style="display:none;">📷</button>
       <button class="call-btn-round hangup" onclick="endCall(true)">☎</button>
     </div>
   </div>
@@ -737,6 +913,7 @@
         requestNotificationPermission();
         connectSocket();
         renderContacts();
+        renderTopbarProfile();
         goTo('screen-main');
       } catch (err) {
         errorEl.textContent = 'Erro de conexão. Tente novamente.';
@@ -751,6 +928,78 @@
       if (socket) socket.disconnect();
       token = null; myUsername = null; myAvatar = null; contacts = [];
       goTo('screen-splash');
+    }
+
+    // ---------- Cabeçalho (foto + nome de quem está logado) ----------
+    function renderTopbarProfile() {
+      renderAvatarInto(document.getElementById('my-avatar-topbar'), myUsername, myAvatar);
+      document.getElementById('my-username-topbar').textContent = myUsername || '';
+    }
+
+    // ---------- Tela 7: Configurações / editar perfil ----------
+    let pendingSettingsAvatarDataUrl = null;
+
+    function openSettings() {
+      pendingSettingsAvatarDataUrl = null;
+      document.getElementById('settings-username-pill').textContent = myUsername;
+      document.getElementById('settings-username-input').value = myUsername;
+      document.getElementById('settings-error').textContent = '';
+      renderAvatarInto(document.getElementById('settings-avatar-btn'), myUsername, myAvatar);
+      goTo('screen-settings');
+    }
+
+    async function onSettingsAvatarSelected(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      pendingSettingsAvatarDataUrl = await resizeImage(file, 300, 0.85);
+      renderAvatarInto(document.getElementById('settings-avatar-btn'), myUsername, pendingSettingsAvatarDataUrl);
+    }
+
+    async function saveSettings() {
+      const errorEl = document.getElementById('settings-error');
+      errorEl.textContent = '';
+      const newUsername = normalize(document.getElementById('settings-username-input').value);
+
+      if (!newUsername) {
+        errorEl.textContent = 'Digite um nome de usuário.';
+        return;
+      }
+
+      const body = { username: newUsername };
+      if (pendingSettingsAvatarDataUrl) body.avatar = pendingSettingsAvatarDataUrl;
+
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Não foi possível salvar.';
+          return;
+        }
+
+        const usernameChanged = data.username !== myUsername;
+        token = data.token;
+        myUsername = data.username;
+        myAvatar = data.avatar || null;
+        localStorage.setItem(STORAGE_TOKEN, token);
+        localStorage.setItem(STORAGE_USERNAME, myUsername);
+        if (myAvatar) localStorage.setItem(STORAGE_AVATAR, myAvatar);
+        else localStorage.removeItem(STORAGE_AVATAR);
+
+        renderTopbarProfile();
+        if (usernameChanged && socket) {
+          // Reconecta o socket usando o token novo (com o nome de usuário atualizado)
+          socket.disconnect();
+          connectSocket();
+        }
+        goTo('screen-main');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
     }
 
     // ---------- Tela 3: lista de contatos ----------
@@ -1222,16 +1471,18 @@
       if (ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; }
     }
 
-    // ---------- WebRTC (chamada de voz) ----------
+    // ---------- WebRTC (chamada de voz / vídeo) ----------
     const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let peerConnection = null;
     let localStream = null;
     let callWith = null;
     let callState = 'idle'; // idle | calling | incoming | connected
+    let currentCallType = 'audio'; // audio | video
     let pendingOffer = null;
     let callTimerInterval = null;
     let callSeconds = 0;
     let muted = false;
+    let cameraOff = false;
 
     function createPeerConnection() {
       peerConnection = new RTCPeerConnection(rtcConfig);
@@ -1241,7 +1492,11 @@
         }
       };
       peerConnection.ontrack = (e) => {
-        document.getElementById('remote-audio').srcObject = e.streams[0];
+        if (currentCallType === 'video') {
+          document.getElementById('remote-video').srcObject = e.streams[0];
+        } else {
+          document.getElementById('remote-audio').srcObject = e.streams[0];
+        }
       };
       peerConnection.onconnectionstatechange = () => {
         if (!peerConnection) return;
@@ -1254,10 +1509,16 @@
       };
     }
 
-    function showCallScreenFor(user) {
+    function showCallScreenFor(user, callType) {
       const contact = findContact(user) || { username: user, avatar: null };
       document.getElementById('call-name-pill').textContent = contact.username;
-      renderAvatarInto(document.getElementById('call-avatar-big'), contact.username, contact.avatar);
+      const isVideo = callType === 'video';
+      document.getElementById('call-video-wrap').style.display = isVideo ? 'block' : 'none';
+      document.getElementById('call-audio-visual').style.display = isVideo ? 'none' : 'flex';
+      document.getElementById('camera-btn').style.display = isVideo ? 'inline-block' : 'none';
+      if (!isVideo) {
+        renderAvatarInto(document.getElementById('call-avatar-big'), contact.username, contact.avatar);
+      }
       goTo('screen-call');
     }
 
@@ -1280,27 +1541,35 @@
       if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
     }
 
-    async function startCall() {
+    async function startCall(callType) {
       if (!currentChatUser || callState !== 'idle') return;
+      currentCallType = callType || 'audio';
       callWith = currentChatUser;
       callState = 'calling';
-      showCallScreenFor(callWith);
+      showCallScreenFor(callWith, currentCallType);
       document.getElementById('call-status-text').textContent = 'Chamando...';
       setCallControls('outgoing');
       requestWakeLock();
 
+      const constraints = currentCallType === 'video'
+        ? { audio: true, video: { facingMode: 'user' } }
+        : { audio: true };
+
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err) {
-        alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+        alert('Não foi possível acessar ' + (currentCallType === 'video' ? 'a câmera/microfone' : 'o microfone') + '. Verifique as permissões do navegador.');
         resetCallState();
         return;
+      }
+      if (currentCallType === 'video') {
+        document.getElementById('local-video').srcObject = localStream;
       }
       createPeerConnection();
       localStream.getTracks().forEach((t) => peerConnection.addTrack(t, localStream));
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
-      socket.emit('call:offer', { to: callWith, offer });
+      socket.emit('call:offer', { to: callWith, offer, callType: currentCallType });
     }
 
     async function acceptCall() {
@@ -1310,12 +1579,19 @@
       setCallControls('active');
       requestWakeLock();
 
+      const constraints = currentCallType === 'video'
+        ? { audio: true, video: { facingMode: 'user' } }
+        : { audio: true };
+
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err) {
-        alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+        alert('Não foi possível acessar ' + (currentCallType === 'video' ? 'a câmera/microfone' : 'o microfone') + '. Verifique as permissões do navegador.');
         rejectCall();
         return;
+      }
+      if (currentCallType === 'video') {
+        document.getElementById('local-video').srcObject = localStream;
       }
       createPeerConnection();
       localStream.getTracks().forEach((t) => peerConnection.addTrack(t, localStream));
@@ -1353,6 +1629,15 @@
       btn.classList.toggle('active', muted);
     }
 
+    function toggleCamera() {
+      if (!localStream) return;
+      cameraOff = !cameraOff;
+      localStream.getVideoTracks().forEach((t) => { t.enabled = !cameraOff; });
+      const btn = document.getElementById('camera-btn');
+      btn.textContent = cameraOff ? '🚫' : '📷';
+      btn.classList.toggle('active', cameraOff);
+    }
+
     function endCall(notify) {
       stopRingtone();
       if (notify && callWith) socket.emit('call:end', { to: callWith });
@@ -1365,10 +1650,13 @@
       if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
       stopRingtone();
       releaseWakeLock();
+      document.getElementById('local-video').srcObject = null;
+      document.getElementById('remote-video').srcObject = null;
       callWith = null;
       callState = 'idle';
       pendingOffer = null;
       muted = false;
+      cameraOff = false;
       goTo(currentChatUser ? 'screen-chat' : 'screen-main');
     }
 
@@ -1421,7 +1709,7 @@
       });
 
       // --- Sinalização de chamada ---
-      socket.on('call:offer', ({ from, offer }) => {
+      socket.on('call:offer', ({ from, offer, callType }) => {
         if (callState !== 'idle') {
           socket.emit('call:reject', { to: from });
           return;
@@ -1429,11 +1717,13 @@
         callWith = from;
         callState = 'incoming';
         pendingOffer = offer;
-        showCallScreenFor(from);
-        document.getElementById('call-status-text').textContent = 'Chamada de voz recebida';
+        currentCallType = callType === 'video' ? 'video' : 'audio';
+        showCallScreenFor(from, currentCallType);
+        const label = currentCallType === 'video' ? 'Chamada de vídeo recebida' : 'Chamada de voz recebida';
+        document.getElementById('call-status-text').textContent = label;
         setCallControls('incoming');
         startRingtone();
-        showBrowserNotification(from, 'Chamada de voz recebida');
+        showBrowserNotification(from, label);
       });
 
       socket.on('call:answer', async ({ answer }) => {
@@ -1468,6 +1758,7 @@
       requestNotificationPermission();
       connectSocket();
       renderContacts();
+      renderTopbarProfile();
       goTo('screen-main');
     }
   </script>
