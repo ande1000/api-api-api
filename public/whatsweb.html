@@ -196,6 +196,20 @@
     flex-shrink: 0;
     line-height: 0;
   }
+  .unread-badge {
+    background: var(--green);
+    color: #0B3D1E;
+    font-weight: 800;
+    font-size: 0.75rem;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    padding: 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
   .empty-contacts {
     color: #888;
     text-align: center;
@@ -711,22 +725,31 @@
 
         const status = document.createElement('div');
         status.className = 'contact-status' + (contact.online ? ' online' : '');
-        status.textContent = contact.online ? 'online' : 'offline';
+        status.textContent = contact.typing ? 'digitando...' : (contact.online ? 'online' : 'offline');
 
         info.appendChild(name);
         info.appendChild(status);
+
+        row.appendChild(avatar);
+        row.appendChild(info);
+
+        if (contact.unread > 0) {
+          const badge = document.createElement('div');
+          badge.className = 'unread-badge';
+          badge.textContent = contact.unread > 99 ? '99+' : String(contact.unread);
+          row.appendChild(badge);
+        }
 
         const trashBtn = document.createElement('button');
         trashBtn.className = 'trash-btn';
         trashBtn.textContent = '🗑';
         trashBtn.onclick = (e) => { e.stopPropagation(); removeContact(contact.username); };
 
-        row.appendChild(avatar);
-        row.appendChild(info);
         row.appendChild(trashBtn);
         list.appendChild(row);
       });
     }
+
 
     function removeContact(username) {
       if (!confirm('Apagar ' + username + ' dos seus contatos?')) return;
@@ -786,6 +809,14 @@
       document.getElementById('messages').innerHTML = '';
       goTo('screen-chat');
 
+      // Zera o contador de mensagens não lidas desse contato
+      const contactEntry = findContact(user);
+      if (contactEntry && contactEntry.unread) {
+        contactEntry.unread = 0;
+        saveContacts();
+        renderContacts();
+      }
+
       // Usa dados já salvos localmente enquanto busca a versão mais atual
       const cached = findContact(user);
       const avatarEl = document.getElementById('chat-avatar');
@@ -812,10 +843,28 @@
       } catch (err) { /* segue sem histórico se der erro de rede */ }
     }
 
+    let chatContactOnline = false;
     function setChatStatus(online) {
+      chatContactOnline = online;
       const el = document.getElementById('chat-contact-status');
       el.textContent = online ? 'online' : 'offline';
       el.className = 'status' + (online ? ' online' : '');
+    }
+
+    let remoteTypingTimeout = null;
+    function setChatTypingDisplay(isTyping) {
+      const el = document.getElementById('chat-contact-status');
+      if (isTyping) {
+        el.textContent = 'digitando...';
+        el.className = 'status online';
+        // Se não vier o aviso de "parou de digitar" por algum motivo, volta ao normal sozinho
+        clearTimeout(remoteTypingTimeout);
+        remoteTypingTimeout = setTimeout(() => setChatTypingDisplay(false), 4000);
+      } else {
+        clearTimeout(remoteTypingTimeout);
+        el.textContent = chatContactOnline ? 'online' : 'offline';
+        el.className = 'status' + (chatContactOnline ? ' online' : '');
+      }
     }
 
     function appendBubble(msg) {
@@ -852,7 +901,32 @@
       appendBubble({ from_user: myUsername, content });
       scrollToBottom();
       input.value = '';
+      stopTypingSignal();
     }
+
+    // ---------- Avisa em tempo real quando você está digitando ----------
+    let isTypingSignalActive = false;
+    let typingStopTimer = null;
+
+    function startTypingSignal() {
+      if (!currentChatUser || !socket) return;
+      if (!isTypingSignalActive) {
+        isTypingSignalActive = true;
+        socket.emit('typing', { to: currentChatUser, isTyping: true });
+      }
+      clearTimeout(typingStopTimer);
+      typingStopTimer = setTimeout(stopTypingSignal, 2000);
+    }
+
+    function stopTypingSignal() {
+      clearTimeout(typingStopTimer);
+      if (isTypingSignalActive && currentChatUser && socket) {
+        socket.emit('typing', { to: currentChatUser, isTyping: false });
+      }
+      isTypingSignalActive = false;
+    }
+
+    document.getElementById('message-input').addEventListener('input', startTypingSignal);
 
     document.getElementById('message-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage();
@@ -896,7 +970,50 @@
     // ---------- Notificações ----------
     function requestNotificationPermission() {
       if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
+        Notification.requestPermission().then(() => setupPushSubscription());
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        setupPushSubscription();
+      }
+    }
+
+    // Converte a chave pública (formato base64 usado na web) para o formato que o navegador espera
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
+    }
+
+    // Registra o Service Worker e inscreve o navegador nas notificações push.
+    // A partir daqui, o servidor consegue notificar mesmo com o app fechado
+    // ou a tela do celular apagada.
+    async function setupPushSubscription() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      if (!token) return;
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
+
+        const keyRes = await fetch('/api/push/vapid-public-key');
+        const { publicKey } = await keyRes.json();
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+        }
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ subscription }),
+        });
+      } catch (err) {
+        console.log('Não foi possível ativar notificação push:', err);
       }
     }
 
@@ -914,10 +1031,11 @@
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
+          osc.type = 'square';
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.16, ctx.currentTime);
+          gain.gain.setValueAtTime(0.6, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
           osc.start();
           osc.stop(ctx.currentTime + duration);
@@ -927,16 +1045,21 @@
     }
 
     function playMessageSound() {
-      playTone(920, 0.12, 0);
-      playTone(1300, 0.14, 110);
+      playTone(1046, 0.16, 0);
+      playTone(1568, 0.2, 130);
+      if (navigator.vibrate) navigator.vibrate(200);
     }
 
     let ringtoneInterval = null;
     function startRingtone() {
       stopRingtone();
-      const ring = () => { playTone(660, 0.35, 0); playTone(660, 0.35, 450); };
+      const ring = () => {
+        playTone(880, 0.4, 0);
+        playTone(660, 0.4, 480);
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+      };
       ring();
-      ringtoneInterval = setInterval(ring, 1600);
+      ringtoneInterval = setInterval(ring, 1700);
     }
     function stopRingtone() {
       if (ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; }
@@ -987,6 +1110,19 @@
       document.getElementById('call-controls-active').style.display = mode === 'active' ? 'flex' : 'none';
     }
 
+    // ---------- Manter a tela ligada durante a chamada ----------
+    let wakeLock = null;
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) { /* alguns navegadores não suportam, tudo bem */ }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    }
+
     async function startCall() {
       if (!currentChatUser || callState !== 'idle') return;
       callWith = currentChatUser;
@@ -994,6 +1130,7 @@
       showCallScreenFor(callWith);
       document.getElementById('call-status-text').textContent = 'Chamando...';
       setCallControls('outgoing');
+      requestWakeLock();
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1014,6 +1151,7 @@
       callState = 'connecting';
       document.getElementById('call-status-text').textContent = 'Conectando...';
       setCallControls('active');
+      requestWakeLock();
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1069,6 +1207,7 @@
       if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
       if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
       stopRingtone();
+      releaseWakeLock();
       callWith = null;
       callState = 'idle';
       pendingOffer = null;
@@ -1091,17 +1230,26 @@
         if (currentChatUser === username) setChatStatus(online);
       });
 
+      socket.on('typing', ({ from, isTyping }) => {
+        if (currentChatUser === from) setChatTypingDisplay(isTyping);
+      });
+
       socket.on('message', (msg) => {
         const otherUser = msg.from_user === myUsername ? msg.to_user : msg.from_user;
         if (!findContact(otherUser)) {
-          contacts.push({ username: otherUser, avatar: null, online: true });
+          contacts.push({ username: otherUser, avatar: null, online: true, unread: 0 });
           saveContacts();
-          renderContacts();
         }
         if (currentChatUser === otherUser) {
           appendBubble(msg);
           scrollToBottom();
+        } else if (msg.from_user !== myUsername) {
+          // Conversa não está aberta agora — soma no contador de não lidas
+          const contactEntry = findContact(otherUser);
+          if (contactEntry) contactEntry.unread = (contactEntry.unread || 0) + 1;
+          saveContacts();
         }
+        renderContacts();
         if (msg.from_user !== myUsername) {
           playMessageSound();
           showBrowserNotification(
