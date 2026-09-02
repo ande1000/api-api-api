@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const webpush = require('web-push');
 const path = require('path');
 
 const app = express();
@@ -17,6 +18,13 @@ const io = new Server(server, {
 
 // Em produção, defina a variável de ambiente JWT_SECRET com um valor único e secreto.
 const JWT_SECRET = process.env.JWT_SECRET || 'troque-esse-segredo-em-producao';
+
+// Chaves para notificação push (permitem notificar mesmo com o app fechado/tela apagada).
+// Em produção, o ideal é gerar seu próprio par e colocar nas variáveis de ambiente
+// VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY (rode: npx web-push generate-vapid-keys).
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BB_vj2hyVfz0fdnymbv9cWbVf5oJmm7uEaVQz8-ZXy8kLJ11z8qX5zWQbAq5BqAve1kRKg-Kc3pJ34aMocCxO2g';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'J8ioJc-NL9r0sSCWplbz7KC6pE02L3zPYWOPyUUSYws';
+webpush.setVapidDetails('mailto:contato@whatswebapp.exemplo', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 // ---------------------------------------------------------------------------
 // Banco de dados (SQLite em arquivo)
@@ -39,6 +47,12 @@ db.exec(`
     content TEXT NOT NULL,
     delivered INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    username TEXT PRIMARY KEY,
+    subscription TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
   );
 `);
 
@@ -75,6 +89,32 @@ const deleteConversation = db.prepare(`
   DELETE FROM messages
   WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
 `);
+
+const savePushSubscription = db.prepare(`
+  INSERT INTO push_subscriptions (username, subscription, updated_at)
+  VALUES (?, ?, datetime('now'))
+  ON CONFLICT(username) DO UPDATE SET subscription = excluded.subscription, updated_at = datetime('now')
+`);
+const getPushSubscription = db.prepare(`SELECT subscription FROM push_subscriptions WHERE username = ?`);
+const deletePushSubscription = db.prepare(`DELETE FROM push_subscriptions WHERE username = ?`);
+
+// Envia uma notificação push para um usuário, se ele tiver se inscrito.
+// Isso funciona mesmo com o app fechado ou a tela do celular apagada.
+async function sendPushToUser(username, payload) {
+  const row = getPushSubscription.get(username);
+  if (!row) return;
+  try {
+    const subscription = JSON.parse(row.subscription);
+    await webpush.sendNotification(subscription, JSON.stringify(payload));
+  } catch (err) {
+    // Inscrição expirada ou inválida — remove para não tentar de novo à toa.
+    if (err.statusCode === 404 || err.statusCode === 410) {
+      deletePushSubscription.run(username);
+    } else {
+      console.error('Erro ao enviar push para', username, err.message);
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Autenticação
@@ -202,6 +242,14 @@ function deliverMessage(from, to, content) {
 
   if (delivered) {
     io.to(targetSocketId).emit('message', message);
+  } else {
+    // Ninguém com o app aberto agora — tenta acordar via notificação push,
+    // que funciona mesmo com o app fechado ou a tela apagada.
+    sendPushToUser(to, {
+      type: 'message',
+      title: from,
+      body: content.startsWith('data:image') ? '📷 Foto' : content,
+    });
   }
 
   return message;
@@ -263,11 +311,24 @@ io.on('connection', (socket) => {
     }
   }
 
-  socket.on('call:offer', ({ to, offer }) => relayToUser('call:offer', to, { offer }));
+  socket.on('call:offer', ({ to, offer }) => {
+    relayToUser('call:offer', to, { offer });
+    // Se a pessoa não estiver com o app aberto, manda notificação push também.
+    if (!onlineUsers.has(normalizeUsername(to))) {
+      sendPushToUser(normalizeUsername(to), {
+        type: 'call',
+        title: username,
+        body: 'Chamada de voz recebida',
+      });
+    }
+  });
   socket.on('call:answer', ({ to, answer }) => relayToUser('call:answer', to, { answer }));
   socket.on('call:ice-candidate', ({ to, candidate }) => relayToUser('call:ice-candidate', to, { candidate }));
   socket.on('call:end', ({ to }) => relayToUser('call:end', to, {}));
   socket.on('call:reject', ({ to }) => relayToUser('call:reject', to, {}));
+
+  // --- "Digitando..." em tempo real ---
+  socket.on('typing', ({ to, isTyping }) => relayToUser('typing', to, { isTyping: !!isTyping }));
 });
 
 // ---------------------------------------------------------------------------
@@ -309,6 +370,25 @@ app.get('/conversations', requireAuth, (req, res) => {
 // Lista quem está online agora: GET /online
 app.get('/online', (req, res) => {
   res.json(Array.from(onlineUsers.keys()));
+});
+
+// Chave pública usada pelo navegador para se inscrever nas notificações push
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+// Salva a inscrição push do usuário logado (chamado pelo navegador dele)
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription) return res.status(400).json({ error: 'Inscrição não enviada' });
+  savePushSubscription.run(req.username, JSON.stringify(subscription));
+  res.json({ ok: true });
+});
+
+// Remove a inscrição push do usuário logado (ex: ao sair da conta)
+app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
+  deletePushSubscription.run(req.username);
+  res.json({ ok: true });
 });
 
 // Qualquer rota que não seja da API cai na tela principal do whats web app
