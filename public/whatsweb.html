@@ -340,6 +340,7 @@
     line-height: 1.4;
     color: var(--white);
   }
+  .bubble audio { display: block; margin-top: 2px; max-width: 220px; }
   .bubble-row.them .bubble { background: var(--grey-bubble); border-bottom-left-radius: 3px; }
   .bubble-row.me .bubble { background: var(--green-dark); border-bottom-right-radius: 3px; }
   .bubble img { max-width: 100%; border-radius: 8px; display: block; }
@@ -362,6 +363,47 @@
     cursor: pointer;
     flex-shrink: 0;
     line-height: 0;
+  }
+  .audio-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--white);
+    font-size: 1.2rem;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 0;
+  }
+  .audio-btn.recording {
+    background: var(--red);
+    animation: pulse-record 1s infinite;
+  }
+  @keyframes pulse-record {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  .recording-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #2a2a2a;
+    color: var(--white);
+    font-size: 0.9rem;
+  }
+  .recording-bar.active { display: flex; }
+  .rec-dot { color: var(--red); animation: pulse-record 1s infinite; }
+  .recording-hint { color: #aaa; flex: 1; }
+  .cancel-record-btn {
+    background: none;
+    border: 1px solid #777;
+    color: var(--white);
+    border-radius: 14px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
   }
   .composer input[type="text"] {
     flex: 1;
@@ -536,10 +578,17 @@
       <button class="icon-btn" onclick="toggleChatMenu()" title="Mais opções">⋮</button>
     </div>
     <div class="messages" id="messages"></div>
+    <div class="recording-bar" id="recording-bar">
+      <span class="rec-dot">●</span>
+      <span id="recording-timer">0:00</span>
+      <span class="recording-hint">Gravando áudio...</span>
+      <button class="cancel-record-btn" onclick="cancelAudioRecording()">Cancelar</button>
+    </div>
     <div class="composer">
       <button class="photo-btn" onclick="document.getElementById('photo-input').click()">+</button>
       <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
       <input type="text" id="message-input" placeholder="diginta sua mesagem aqui" autocomplete="off" />
+      <button class="audio-btn" id="audio-btn" onclick="toggleAudioRecording()" title="Gravar áudio">🎤</button>
       <button class="send-btn" onclick="sendMessage()">✓</button>
     </div>
   </div>
@@ -880,6 +929,11 @@
         const img = document.createElement('img');
         img.src = msg.content;
         bubble.appendChild(img);
+      } else if (typeof msg.content === 'string' && msg.content.startsWith('data:audio')) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = msg.content;
+        bubble.appendChild(audio);
       } else {
         bubble.textContent = msg.content;
       }
@@ -931,6 +985,88 @@
     document.getElementById('message-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage();
     });
+
+    // ---------- Gravação e envio de mensagem de voz ----------
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecordingAudio = false;
+    let discardRecording = false;
+    let recordSeconds = 0;
+    let recordTimerInterval = null;
+
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function toggleAudioRecording() {
+      if (!currentChatUser) return;
+      if (isRecordingAudio) {
+        mediaRecorder.stop();
+        return;
+      }
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+        return;
+      }
+
+      audioChunks = [];
+      discardRecording = false;
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        isRecordingAudio = false;
+        clearInterval(recordTimerInterval);
+        document.getElementById('recording-bar').classList.remove('active');
+        document.getElementById('audio-btn').classList.remove('recording');
+        document.getElementById('audio-btn').textContent = '🎤';
+
+        if (discardRecording || audioChunks.length === 0) {
+          discardRecording = false;
+          return;
+        }
+
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const dataUrl = await blobToDataUrl(blob);
+        socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
+        appendBubble({ from_user: myUsername, content: dataUrl });
+        scrollToBottom();
+      };
+
+      mediaRecorder.start();
+      isRecordingAudio = true;
+      recordSeconds = 0;
+      document.getElementById('recording-timer').textContent = '0:00';
+      document.getElementById('recording-bar').classList.add('active');
+      document.getElementById('audio-btn').classList.add('recording');
+      document.getElementById('audio-btn').textContent = '⏹';
+
+      recordTimerInterval = setInterval(() => {
+        recordSeconds++;
+        const m = Math.floor(recordSeconds / 60);
+        const s = String(recordSeconds % 60).padStart(2, '0');
+        document.getElementById('recording-timer').textContent = m + ':' + s;
+      }, 1000);
+    }
+
+    function cancelAudioRecording() {
+      if (!isRecordingAudio) return;
+      discardRecording = true;
+      mediaRecorder.stop();
+    }
 
     // ---------- Envio de foto ----------
     async function sendPhoto(event) {
@@ -1254,7 +1390,7 @@
           playMessageSound();
           showBrowserNotification(
             msg.from_user,
-            msg.content.startsWith('data:image') ? '📷 Foto' : msg.content
+            msg.content.startsWith('data:image') ? '📷 Foto' : msg.content.startsWith('data:audio') ? '🎤 Áudio' : msg.content
           );
         }
       });
