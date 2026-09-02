@@ -329,6 +329,9 @@ io.on('connection', (socket) => {
 
   // --- "Digitando..." em tempo real ---
   socket.on('typing', ({ to, isTyping }) => relayToUser('typing', to, { isTyping: !!isTyping }));
+
+  // --- "Gravando áudio..." em tempo real ---
+  socket.on('recording', ({ to, isRecording }) => relayToUser('recording', to, { isRecording: !!isRecording }));
 });
 
 // ---------------------------------------------------------------------------
