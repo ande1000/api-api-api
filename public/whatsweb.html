@@ -905,20 +905,31 @@
       el.className = 'status' + (online ? ' online' : '');
     }
 
-    let remoteTypingTimeout = null;
-    function setChatTypingDisplay(isTyping) {
+    // Mostra um status temporário no lugar de "online/offline" (usado para
+    // "digitando..." e "gravando áudio..."), voltando ao normal sozinho depois.
+    let statusOverrideTimeout = null;
+    function showChatStatusOverride(text) {
       const el = document.getElementById('chat-contact-status');
-      if (isTyping) {
-        el.textContent = 'digitando...';
-        el.className = 'status online';
-        // Se não vier o aviso de "parou de digitar" por algum motivo, volta ao normal sozinho
-        clearTimeout(remoteTypingTimeout);
-        remoteTypingTimeout = setTimeout(() => setChatTypingDisplay(false), 4000);
-      } else {
-        clearTimeout(remoteTypingTimeout);
-        el.textContent = chatContactOnline ? 'online' : 'offline';
-        el.className = 'status' + (chatContactOnline ? ' online' : '');
-      }
+      el.textContent = text;
+      el.className = 'status online';
+      clearTimeout(statusOverrideTimeout);
+      statusOverrideTimeout = setTimeout(clearChatStatusOverride, 4000);
+    }
+    function clearChatStatusOverride() {
+      clearTimeout(statusOverrideTimeout);
+      const el = document.getElementById('chat-contact-status');
+      el.textContent = chatContactOnline ? 'online' : 'offline';
+      el.className = 'status' + (chatContactOnline ? ' online' : '');
+    }
+
+    function setChatTypingDisplay(isTyping) {
+      if (isTyping) showChatStatusOverride('digitando...');
+      else clearChatStatusOverride();
+    }
+
+    function setChatRecordingDisplay(isRecording) {
+      if (isRecording) showChatStatusOverride('gravando áudio...');
+      else clearChatStatusOverride();
     }
 
     function appendBubble(msg) {
@@ -1023,6 +1034,7 @@
         return;
       }
 
+      const recordingTarget = currentChatUser;
       audioChunks = [];
       discardRecording = false;
       mediaRecorder = new MediaRecorder(stream);
@@ -1038,6 +1050,7 @@
         document.getElementById('recording-bar').classList.remove('active');
         document.getElementById('audio-btn').classList.remove('recording');
         document.getElementById('audio-btn').textContent = '🎤';
+        if (socket) socket.emit('recording', { to: recordingTarget, isRecording: false });
 
         if (discardRecording || audioChunks.length === 0) {
           discardRecording = false;
@@ -1046,9 +1059,11 @@
 
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         const dataUrl = await blobToDataUrl(blob);
-        socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
-        appendBubble({ from_user: myUsername, content: dataUrl });
-        scrollToBottom();
+        socket.emit('sendMessage', { to: recordingTarget, content: dataUrl });
+        if (currentChatUser === recordingTarget) {
+          appendBubble({ from_user: myUsername, content: dataUrl });
+          scrollToBottom();
+        }
       };
 
       mediaRecorder.start();
@@ -1058,6 +1073,7 @@
       document.getElementById('recording-bar').classList.add('active');
       document.getElementById('audio-btn').classList.add('recording');
       document.getElementById('audio-btn').textContent = '⏹';
+      socket.emit('recording', { to: recordingTarget, isRecording: true });
 
       recordTimerInterval = setInterval(() => {
         recordSeconds++;
@@ -1373,6 +1389,10 @@
 
       socket.on('typing', ({ from, isTyping }) => {
         if (currentChatUser === from) setChatTypingDisplay(isTyping);
+      });
+
+      socket.on('recording', ({ from, isRecording }) => {
+        if (currentChatUser === from) setChatRecordingDisplay(isRecording);
       });
 
       socket.on('message', (msg) => {
