@@ -208,6 +208,46 @@ app.get('/api/user/:username', (req, res) => {
   });
 });
 
+// Edita o próprio perfil (foto e/ou nome de usuário). Exige estar logado.
+// Se o nome de usuário mudar, um novo token é devolvido (o antigo passa a
+// não corresponder a ninguém, já que o nome dele não existe mais).
+app.post('/api/profile', requireAuth, (req, res) => {
+  const currentUsername = req.username;
+  let finalUsername = currentUsername;
+
+  if (req.body.username !== undefined) {
+    const newUsername = normalizeUsername(req.body.username);
+    if (!newUsername) {
+      return res.status(400).json({ error: 'Nome de usuário inválido' });
+    }
+    if (newUsername !== currentUsername) {
+      if (findUser.get(newUsername)) {
+        return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
+      }
+      db.prepare(`UPDATE users SET username = ? WHERE username = ?`).run(newUsername, currentUsername);
+      db.prepare(`UPDATE messages SET from_user = ? WHERE from_user = ?`).run(newUsername, currentUsername);
+      db.prepare(`UPDATE messages SET to_user = ? WHERE to_user = ?`).run(newUsername, currentUsername);
+      db.prepare(`UPDATE push_subscriptions SET username = ? WHERE username = ?`).run(newUsername, currentUsername);
+      finalUsername = newUsername;
+
+      // Se essa pessoa estiver com o app aberto agora, atualiza o registro de quem está online
+      if (onlineUsers.has(currentUsername)) {
+        const socketId = onlineUsers.get(currentUsername);
+        onlineUsers.delete(currentUsername);
+        onlineUsers.set(finalUsername, socketId);
+      }
+    }
+  }
+
+  if (typeof req.body.avatar === 'string') {
+    updateAvatar.run(req.body.avatar, finalUsername);
+  }
+
+  const updatedUser = findUser.get(finalUsername);
+  const token = createToken(finalUsername);
+  res.json({ token, username: finalUsername, avatar: updatedUser ? updatedUser.avatar : null });
+});
+
 // Login: POST /api/login  { username, password }
 app.post('/api/login', (req, res) => {
   const username = normalizeUsername(req.body.username);
@@ -311,14 +351,14 @@ io.on('connection', (socket) => {
     }
   }
 
-  socket.on('call:offer', ({ to, offer }) => {
-    relayToUser('call:offer', to, { offer });
+  socket.on('call:offer', ({ to, offer, callType }) => {
+    relayToUser('call:offer', to, { offer, callType });
     // Se a pessoa não estiver com o app aberto, manda notificação push também.
     if (!onlineUsers.has(normalizeUsername(to))) {
       sendPushToUser(normalizeUsername(to), {
         type: 'call',
         title: username,
-        body: 'Chamada de voz recebida',
+        body: callType === 'video' ? 'Chamada de vídeo recebida' : 'Chamada de voz recebida',
       });
     }
   });
