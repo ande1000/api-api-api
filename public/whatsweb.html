@@ -2425,6 +2425,15 @@
         }
       });
 
+      socket.on('groupAdded', (group) => {
+        if (!groups.find((g) => g.id === group.id)) {
+          groups.push(group);
+          renderContacts();
+          playMessageSound();
+          showBrowserNotification(group.name, 'Você foi adicionado a esse grupo');
+        }
+      });
+
       socket.on('groupMessage', (msg) => {
         if (currentGroupId === msg.group_id && msg.from_user !== myUsername) {
           appendBubble(msg);
