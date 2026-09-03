@@ -232,6 +232,17 @@
     cursor: pointer;
   }
   .contact-row:active { background: #1a1a1a; }
+  .avatar-wrap { position: relative; flex-shrink: 0; }
+  .group-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--red);
+    border: 2px solid var(--black);
+  }
   .avatar {
     width: 46px;
     height: 46px;
@@ -401,6 +412,177 @@
     color: var(--black);
   }
 
+  /* ---------- Menu de configurações ---------- */
+  #screen-settings-menu {
+    background: var(--black);
+    padding: 20px 24px;
+    gap: 14px;
+    position: relative;
+  }
+  .settings-menu-header {
+    background: var(--blue);
+    color: var(--white);
+    font-weight: 800;
+    font-size: 1.4rem;
+    text-align: center;
+    padding: 16px;
+    margin: -20px -24px 20px;
+  }
+  .settings-menu-item {
+    background: var(--white);
+    color: var(--red);
+    border: none;
+    border-radius: 20px;
+    padding: 13px 20px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  .settings-menu-back { position: static; align-self: flex-start; color: var(--white); margin-top: 10px; }
+
+  /* ---------- Telas simples de configuração (boas-vindas, agendar, bloquear, sobre) ---------- */
+  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-create-group, #screen-group-info {
+    background: var(--black);
+    padding: 60px 24px 24px;
+    gap: 14px;
+    position: relative;
+    overflow-y: auto;
+  }
+  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-create-group h1 {
+    color: var(--white);
+    font-size: 1.3rem;
+    font-weight: 800;
+    text-align: center;
+    margin: 0 0 4px;
+  }
+  .settings-hint { color: #999; font-size: 0.85rem; text-align: center; margin: 0 0 6px; }
+  .settings-textarea {
+    width: 100%;
+    max-width: 320px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 320px;
+    color: var(--white);
+    font-size: 0.9rem;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .toggle-row input[type="checkbox"] { display: none; }
+  .toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: #555;
+    border-radius: 14px;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--white);
+    transition: left 0.2s;
+  }
+  .toggle-row input:checked + .toggle-switch { background: var(--green); }
+  .toggle-row input:checked + .toggle-switch::after { left: 23px; }
+
+  .schedule-list { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; }
+  .schedule-item {
+    background: #222;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--white);
+    font-size: 0.85rem;
+  }
+  .schedule-date { color: var(--green); font-size: 0.78rem; }
+  .schedule-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 320px;
+    border-top: 1px solid #333;
+    padding-top: 16px;
+    margin-top: 6px;
+  }
+  .schedule-datetime-row { display: flex; gap: 10px; }
+  .schedule-datetime-row .field { flex: 1; }
+
+  .block-user-list { width: 100%; max-width: 360px; }
+
+  .about-box {
+    background: #1c1c1c;
+    color: var(--white);
+    border-radius: 10px;
+    padding: 18px 20px;
+    width: 100%;
+    max-width: 320px;
+    line-height: 1.8;
+    font-size: 0.9rem;
+  }
+
+  /* ---------- Criar grupo / info do grupo ---------- */
+  .group-members-list {
+    width: 100%;
+    max-width: 320px;
+    background: #1c1c1c;
+    border-radius: 8px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+  .group-member-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    color: var(--white);
+    font-size: 0.9rem;
+  }
+  .group-member-row input { flex-shrink: 0; }
+  .permission-row { display: flex; gap: 24px; }
+  .permission-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--white);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .group-info-box {
+    width: 100%;
+    max-width: 340px;
+    margin-top: 10px;
+  }
+  .group-info-label {
+    color: var(--red);
+    font-weight: 800;
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+  }
+  .group-info-content {
+    background: var(--white);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--black);
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  .group-info-content .member-line { padding: 3px 0; }
+
   /* ---------- Conversa ---------- */
   #screen-chat { background: var(--grey-dark); }
   .chat-topbar {
@@ -469,6 +651,7 @@
   }
   .bubble audio { display: block; margin-top: 2px; max-width: 220px; }
   .bubble-row.them .bubble { background: var(--grey-bubble); border-bottom-left-radius: 3px; }
+  .bubble-sender { font-size: 0.75rem; font-weight: 800; color: var(--green); margin-bottom: 2px; }
   .bubble-row.me .bubble { background: var(--green-dark); border-bottom-right-radius: 3px; }
   .bubble img { max-width: 100%; border-radius: 8px; display: block; }
   .composer {
@@ -751,14 +934,14 @@
   <!-- TELA 3: Principal (lista de contatos) -->
   <div class="screen" id="screen-main">
     <div class="topbar">
-      <div class="topbar-left" onclick="openSettings()">
+      <div class="topbar-left" onclick="openSettingsMenu()">
         <div class="avatar" id="my-avatar-topbar"></div>
         <div class="topbar-username" id="my-username-topbar"></div>
       </div>
       <h1 class="topbar-title">WHATS WEB APP</h1>
       <div class="topbar-right">
-        <button class="settings-btn" onclick="openSettings()" title="Ver perfil">
-          <span class="settings-label">VER PERFIL</span>
+        <button class="settings-btn" onclick="openSettingsMenu()" title="Configuração">
+          <span class="settings-label">CONFIGURAÇÃO</span>
           <span class="settings-icon">⚙</span>
         </button>
         <span class="logout-link" onclick="logout()">SAIR</span>
@@ -771,9 +954,9 @@
     <button class="fab" onclick="goTo('screen-add-user')">+</button>
   </div>
 
-  <!-- TELA 7: Configurações / editar perfil -->
-  <div class="screen" id="screen-settings">
-    <button class="back-arrow" onclick="goTo('screen-main')">←</button>
+  <!-- TELA 7: Editar perfil (dentro de Configurações > Ver perfil) -->
+  <div class="screen" id="screen-profile-edit">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
     <div class="settings-username-pill" id="settings-username-pill"></div>
     <button class="photo-picker settings-avatar-big" id="settings-avatar-btn" onclick="document.getElementById('settings-avatar-input').click()"></button>
     <input type="file" id="settings-avatar-input" accept="image/*" style="display:none" onchange="onSettingsAvatarSelected(event)" />
@@ -784,6 +967,103 @@
     <button class="btn-green" onclick="saveSettings()">salva</button>
   </div>
 
+  <!-- TELA 8: Menu de configurações -->
+  <div class="screen" id="screen-settings-menu">
+    <div class="settings-menu-header">CONFIGURAÇÃO</div>
+    <button class="settings-menu-item" onclick="openCreateGroupScreen()">CRIAR GRUPO</button>
+    <button class="settings-menu-item" onclick="openProfileEdit()">VER PERFIL</button>
+    <button class="settings-menu-item" onclick="openWelcomeMessageScreen()">MENSAGEM DE BOAS VINDAS</button>
+    <button class="settings-menu-item" onclick="openScheduleScreen()">AGENDA MESAGEM</button>
+    <button class="settings-menu-item" onclick="openBlockUserScreen()">BLOQUEAR USUARIO</button>
+    <button class="settings-menu-item" onclick="openAboutScreen()">SOBRE APP</button>
+    <button class="back-arrow settings-menu-back" onclick="goTo('screen-main')">←</button>
+  </div>
+
+  <!-- TELA 9: Mensagem de boas-vindas -->
+  <div class="screen" id="screen-welcome-message">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>Mensagem de boas-vindas</h1>
+    <p class="settings-hint">Enviada automaticamente na primeira mensagem que alguém te mandar.</p>
+    <textarea class="field settings-textarea" id="welcome-message-input" placeholder="Escreva sua mensagem de boas-vindas..." rows="4"></textarea>
+    <label class="toggle-row">
+      <span>Ativar mensagem de boas-vindas</span>
+      <input type="checkbox" id="welcome-enabled-input" />
+      <span class="toggle-switch"></span>
+    </label>
+    <p class="error-text" id="welcome-error"></p>
+    <button class="btn-green" onclick="saveWelcomeMessage()">salvar</button>
+  </div>
+
+  <!-- TELA 10: Agendar mensagem -->
+  <div class="screen" id="screen-schedule">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>Agendar mensagem</h1>
+    <div id="schedule-list" class="schedule-list"></div>
+    <div class="schedule-form" id="schedule-form">
+      <select class="field" id="schedule-to-input"></select>
+      <textarea class="field settings-textarea" id="schedule-content-input" placeholder="Digite a mensagem..." rows="3"></textarea>
+      <div class="schedule-datetime-row">
+        <input class="field" type="date" id="schedule-date-input" />
+        <input class="field" type="time" id="schedule-time-input" />
+      </div>
+      <p class="error-text" id="schedule-error"></p>
+      <button class="btn-green" onclick="createScheduledMessage()">salvar</button>
+    </div>
+  </div>
+
+  <!-- TELA 11: Bloquear usuário -->
+  <div class="screen" id="screen-block-user">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>Bloquear usuário</h1>
+    <p class="settings-hint">Escolha um contato para bloquear. Essa ação é permanente.</p>
+    <div id="block-user-list" class="contact-list block-user-list"></div>
+  </div>
+
+  <!-- TELA 12: Sobre o app -->
+  <div class="screen" id="screen-about">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>WHATS WEB APP</h1>
+    <div class="about-box" id="about-box"></div>
+  </div>
+
+  <!-- TELA 13: Criar grupo -->
+  <div class="screen" id="screen-create-group">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>CRIAR SEU GRUPO</h1>
+    <input class="field" id="group-name-input" placeholder="crie um nome" autocomplete="off" />
+    <button class="photo-picker settings-avatar-big" id="group-avatar-btn" onclick="document.getElementById('group-avatar-input').click()">CARREGA<br/>FOTO</button>
+    <input type="file" id="group-avatar-input" accept="image/*" style="display:none" onchange="onGroupAvatarSelected(event)" />
+    <textarea class="field settings-textarea" id="group-description-input" placeholder="criar uma descrição" rows="3"></textarea>
+    <div id="group-members-list" class="group-members-list"></div>
+    <h2 class="settings-heading" style="font-size:0.95rem;">QUEM PODE ENVIAR MENSAGEM</h2>
+    <div class="permission-row">
+      <label class="permission-option">
+        <input type="radio" name="group-permission" value="adm" />
+        <span>ADM</span>
+      </label>
+      <label class="permission-option">
+        <input type="radio" name="group-permission" value="participante" checked />
+        <span>PARTICIPANTE</span>
+      </label>
+    </div>
+    <p class="error-text" id="group-error"></p>
+    <button class="btn-green" onclick="createGroup()">CRIAR GRUPO</button>
+  </div>
+
+  <!-- TELA 14: Informações do grupo -->
+  <div class="screen" id="screen-group-info">
+    <button class="back-arrow" onclick="goTo('screen-chat')">←</button>
+    <button class="photo-picker settings-avatar-big" id="group-info-avatar" style="pointer-events:none;"></button>
+    <div class="settings-username-pill" id="group-info-name"></div>
+    <div class="group-info-box">
+      <div class="group-info-label">DESCRIÇÃO DO GRUPO</div>
+      <div class="group-info-content" id="group-info-description"></div>
+    </div>
+    <div class="group-info-box">
+      <div class="group-info-label">TODOS PARTICIPANTES DO GRUPO</div>
+      <div class="group-info-content" id="group-info-members"></div>
+    </div>
+  </div>
   <!-- TELA 4: Adicionar usuário -->
   <div class="screen" id="screen-add-user">
     <button class="back-arrow" onclick="goTo('screen-main')">←</button>
@@ -797,15 +1077,15 @@
   <div class="screen" id="screen-chat">
     <div class="chat-topbar">
       <button class="back-arrow" onclick="goTo('screen-main')">←</button>
-      <div class="chat-header-pill" id="chat-header-pill">
+      <div class="chat-header-pill" id="chat-header-pill" onclick="onChatHeaderClick()">
         <div class="avatar" id="chat-avatar"></div>
         <div class="chat-header-text">
           <div class="name" id="chat-contact-name"></div>
           <div class="status" id="chat-contact-status">offline</div>
         </div>
       </div>
-      <button class="icon-btn chat-call-btn" onclick="startCall('audio')" title="Ligar">☎</button>
-      <button class="icon-btn chat-call-btn" onclick="startCall('video')" title="Vídeo chamada">📹</button>
+      <button class="icon-btn chat-call-btn" id="chat-call-audio-btn" onclick="startCall('audio')" title="Ligar">☎</button>
+      <button class="icon-btn chat-call-btn" id="chat-call-video-btn" onclick="startCall('video')" title="Vídeo chamada">📹</button>
       <button class="icon-btn" onclick="toggleChatMenu()" title="Mais opções">⋮</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -875,9 +1155,12 @@
     let myUsername = localStorage.getItem(STORAGE_USERNAME);
     let myAvatar = localStorage.getItem(STORAGE_AVATAR) || null;
     let contacts = JSON.parse(localStorage.getItem(STORAGE_CONTACTS) || '[]'); // [{username, avatar}]
+    let groups = []; // [{id, name, avatar, description, permission, createdBy}]
     let socket = null;
     let currentChatUser = null;
+    let currentGroupId = null;
     let pendingAvatarDataUrl = null;
+    let pendingGroupAvatarDataUrl = null;
 
     function goTo(screenId) {
       document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -1001,16 +1284,21 @@
       document.getElementById('my-username-topbar').textContent = myUsername || '';
     }
 
-    // ---------- Tela 7: Configurações / editar perfil ----------
+    // ---------- Tela 8: Menu de configurações ----------
+    function openSettingsMenu() {
+      goTo('screen-settings-menu');
+    }
+
+    // ---------- Tela 7: Editar perfil ----------
     let pendingSettingsAvatarDataUrl = null;
 
-    function openSettings() {
+    function openProfileEdit() {
       pendingSettingsAvatarDataUrl = null;
       document.getElementById('settings-username-pill').textContent = myUsername;
       document.getElementById('settings-username-input').value = myUsername;
       document.getElementById('settings-error').textContent = '';
       renderAvatarInto(document.getElementById('settings-avatar-btn'), myUsername, myAvatar);
-      goTo('screen-settings');
+      goTo('screen-profile-edit');
     }
 
     async function onSettingsAvatarSelected(event) {
@@ -1067,26 +1355,259 @@
       }
     }
 
+    // ---------- Tela 9: Mensagem de boas-vindas ----------
+    async function openWelcomeMessageScreen() {
+      goTo('screen-welcome-message');
+      document.getElementById('welcome-error').textContent = '';
+      try {
+        const res = await fetch('/api/settings', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('welcome-message-input').value = data.welcomeMessage || '';
+        document.getElementById('welcome-enabled-input').checked = !!data.welcomeEnabled;
+      } catch (err) { /* segue com os campos vazios se der erro */ }
+    }
+
+    async function saveWelcomeMessage() {
+      const errorEl = document.getElementById('welcome-error');
+      errorEl.textContent = '';
+      const welcomeMessage = document.getElementById('welcome-message-input').value.trim();
+      const welcomeEnabled = document.getElementById('welcome-enabled-input').checked;
+
+      if (welcomeEnabled && !welcomeMessage) {
+        errorEl.textContent = 'Escreva uma mensagem antes de ativar.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ welcomeEnabled, welcomeMessage }),
+        });
+        if (!res.ok) {
+          errorEl.textContent = 'Não foi possível salvar.';
+          return;
+        }
+        goTo('screen-settings-menu');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    // ---------- Tela 10: Agendar mensagem ----------
+    async function openScheduleScreen() {
+      goTo('screen-schedule');
+      document.getElementById('schedule-error').textContent = '';
+      document.getElementById('schedule-content-input').value = '';
+
+      const select = document.getElementById('schedule-to-input');
+      select.innerHTML = '';
+      contacts.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.username;
+        opt.textContent = c.username;
+        select.appendChild(opt);
+      });
+      if (contacts.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Você ainda não tem contatos';
+        select.appendChild(opt);
+      }
+
+      await renderScheduledList();
+    }
+
+    async function renderScheduledList() {
+      const listEl = document.getElementById('schedule-list');
+      listEl.innerHTML = '';
+      try {
+        const res = await fetch('/api/scheduled-messages', { headers: { 'Authorization': 'Bearer ' + token } });
+        const items = await res.json();
+        if (items.length === 0) {
+          listEl.innerHTML = '<p class="empty-contacts">Nenhuma mensagem agendada ainda.</p>';
+          return;
+        }
+        items.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'schedule-item';
+          const date = new Date(item.send_at);
+          const dateLabel = date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          row.innerHTML = '<div><strong>' + item.to_user + '</strong><br/>' + item.content + '<br/><span class="schedule-date">' + dateLabel + '</span></div>';
+          const delBtn = document.createElement('button');
+          delBtn.className = 'trash-btn';
+          delBtn.textContent = '🗑';
+          delBtn.onclick = () => deleteScheduledMessage(item.id);
+          row.appendChild(delBtn);
+          listEl.appendChild(row);
+        });
+      } catch (err) {
+        listEl.innerHTML = '<p class="empty-contacts">Erro ao carregar.</p>';
+      }
+    }
+
+    async function deleteScheduledMessage(id) {
+      await fetch('/api/scheduled-messages/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      renderScheduledList();
+    }
+
+    async function createScheduledMessage() {
+      const errorEl = document.getElementById('schedule-error');
+      errorEl.textContent = '';
+      const to = document.getElementById('schedule-to-input').value;
+      const content = document.getElementById('schedule-content-input').value.trim();
+      const date = document.getElementById('schedule-date-input').value;
+      const time = document.getElementById('schedule-time-input').value;
+
+      if (!to) { errorEl.textContent = 'Escolha um contato.'; return; }
+      if (!content) { errorEl.textContent = 'Escreva a mensagem.'; return; }
+      if (!date || !time) { errorEl.textContent = 'Escolha a data e o horário.'; return; }
+
+      const sendAt = new Date(date + 'T' + time).toISOString();
+      if (new Date(sendAt).getTime() <= Date.now()) {
+        errorEl.textContent = 'Escolha um horário no futuro.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/scheduled-messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ to, content, sendAt }),
+        });
+        if (!res.ok) {
+          errorEl.textContent = 'Não foi possível agendar.';
+          return;
+        }
+        document.getElementById('schedule-content-input').value = '';
+        document.getElementById('schedule-date-input').value = '';
+        document.getElementById('schedule-time-input').value = '';
+        renderScheduledList();
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    // ---------- Tela 11: Bloquear usuário ----------
+    function openBlockUserScreen() {
+      goTo('screen-block-user');
+      const listEl = document.getElementById('block-user-list');
+      listEl.innerHTML = '';
+      if (contacts.length === 0) {
+        listEl.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.</p>';
+        return;
+      }
+      contacts.forEach((contact) => {
+        const row = document.createElement('div');
+        row.className = 'contact-row';
+        row.onclick = () => confirmBlockUser(contact.username);
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        renderAvatarInto(avatar, contact.username, contact.avatar);
+
+        const name = document.createElement('div');
+        name.className = 'contact-name';
+        name.textContent = contact.username;
+
+        row.appendChild(avatar);
+        row.appendChild(name);
+        listEl.appendChild(row);
+      });
+    }
+
+    async function confirmBlockUser(username) {
+      if (!confirm('Bloquear "' + username + '"? Essa ação é permanente — você não vai poder adicioná-lo de novo.')) return;
+      try {
+        await fetch('/api/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ username }),
+        });
+        contacts = contacts.filter((c) => c.username !== username);
+        saveContacts();
+        openBlockUserScreen();
+      } catch (err) {
+        alert('Erro de conexão. Tente novamente.');
+      }
+    }
+
+    // ---------- Tela 12: Sobre o app ----------
+    async function openAboutScreen() {
+      goTo('screen-about');
+      const box = document.getElementById('about-box');
+      box.textContent = 'Carregando...';
+      try {
+        const res = await fetch('/api/about');
+        const data = await res.json();
+        box.innerHTML =
+          '<p><strong>Versão:</strong> ' + data.version + '</p>' +
+          '<p><strong>Criado em:</strong> ' + data.createdYear + '</p>' +
+          '<p><strong>Criado por:</strong> ' + data.createdBy + '</p>';
+      } catch (err) {
+        box.textContent = 'Não foi possível carregar as informações.';
+      }
+    }
+
     // ---------- Tela 3: lista de contatos ----------
     function renderContacts() {
       const list = document.getElementById('contact-list');
       list.innerHTML = '';
 
-      if (contacts.length === 0) {
-        list.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.<br/>Toque no + para adicionar alguém pelo nome de usuário.</p>';
-        return;
-      }
-
       const searchEl = document.getElementById('contact-search');
       const query = searchEl ? normalize(searchEl.value) : '';
-      const filtered = query ? contacts.filter((c) => c.username.includes(query)) : contacts;
 
-      if (filtered.length === 0) {
-        list.innerHTML = '<p class="empty-contacts">Nenhum contato encontrado com esse nome.</p>';
+      const filteredContacts = query ? contacts.filter((c) => c.username.includes(query)) : contacts;
+      const filteredGroups = query ? groups.filter((g) => normalize(g.name).includes(query)) : groups;
+
+      if (contacts.length === 0 && groups.length === 0) {
+        list.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.<br/>Toque no + para adicionar alguém pelo nome de usuário, ou crie um grupo nas configurações.</p>';
         return;
       }
 
-      filtered.forEach((contact) => {
+      if (filteredContacts.length === 0 && filteredGroups.length === 0) {
+        list.innerHTML = '<p class="empty-contacts">Nenhum resultado encontrado.</p>';
+        return;
+      }
+
+      filteredGroups.forEach((group) => {
+        const row = document.createElement('div');
+        row.className = 'contact-row';
+
+        const avatarWrap = document.createElement('div');
+        avatarWrap.className = 'avatar-wrap';
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        renderAvatarInto(avatar, group.name, group.avatar);
+        const groupDot = document.createElement('div');
+        groupDot.className = 'group-dot';
+        avatarWrap.appendChild(avatar);
+        avatarWrap.appendChild(groupDot);
+
+        const info = document.createElement('div');
+        info.className = 'contact-info';
+        info.onclick = () => openGroupChat(group.id);
+
+        const name = document.createElement('div');
+        name.className = 'contact-name';
+        name.textContent = group.name;
+
+        const status = document.createElement('div');
+        status.className = 'contact-status';
+        status.textContent = 'grupo';
+
+        info.appendChild(name);
+        info.appendChild(status);
+
+        row.appendChild(avatarWrap);
+        row.appendChild(info);
+        list.appendChild(row);
+      });
+
+      filteredContacts.forEach((contact) => {
         const row = document.createElement('div');
         row.className = 'contact-row';
 
@@ -1184,6 +1705,9 @@
     // ---------- Tela 5: conversa ----------
     async function openChat(user) {
       currentChatUser = user;
+      currentGroupId = null;
+      document.getElementById('chat-call-audio-btn').style.display = 'inline-block';
+      document.getElementById('chat-call-video-btn').style.display = 'inline-block';
       document.getElementById('chat-contact-name').textContent = user;
       document.getElementById('messages').innerHTML = '';
       goTo('screen-chat');
@@ -1220,6 +1744,69 @@
         history.forEach(appendBubble);
         scrollToBottom();
       } catch (err) { /* segue sem histórico se der erro de rede */ }
+    }
+
+    function onChatHeaderClick() {
+      if (currentGroupId) openGroupInfo(currentGroupId);
+    }
+
+    // ---------- Conversa em grupo ----------
+    let currentGroupData = null;
+
+    async function openGroupChat(groupId) {
+      currentChatUser = null;
+      currentGroupId = groupId;
+      document.getElementById('chat-call-audio-btn').style.display = 'none';
+      document.getElementById('chat-call-video-btn').style.display = 'none';
+      document.getElementById('messages').innerHTML = '';
+      goTo('screen-chat');
+
+      const cachedGroup = groups.find((g) => g.id === groupId);
+      if (cachedGroup) {
+        document.getElementById('chat-contact-name').textContent = cachedGroup.name;
+        renderAvatarInto(document.getElementById('chat-avatar'), cachedGroup.name, cachedGroup.avatar);
+      }
+      document.getElementById('chat-contact-status').textContent = 'grupo';
+      document.getElementById('chat-contact-status').className = 'status';
+
+      try {
+        const res = await fetch('/api/groups/' + groupId, { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+          currentGroupData = await res.json();
+          document.getElementById('chat-contact-name').textContent = currentGroupData.name;
+          renderAvatarInto(document.getElementById('chat-avatar'), currentGroupData.name, currentGroupData.avatar);
+          document.getElementById('chat-contact-status').textContent = currentGroupData.members.length + ' participantes';
+        }
+      } catch (err) { /* segue com os dados em cache */ }
+
+      try {
+        const historyRes = await fetch('/api/groups/' + groupId + '/messages', { headers: { 'Authorization': 'Bearer ' + token } });
+        const history = await historyRes.json();
+        history.forEach((msg) => appendBubble({ from_user: msg.from_user, content: msg.content, senderLabel: msg.from_user }));
+        scrollToBottom();
+      } catch (err) { /* segue sem histórico */ }
+    }
+
+    async function openGroupInfo(groupId) {
+      try {
+        const res = await fetch('/api/groups/' + groupId, { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) return;
+        const group = await res.json();
+        renderAvatarInto(document.getElementById('group-info-avatar'), group.name, group.avatar);
+        document.getElementById('group-info-name').textContent = group.name;
+        document.getElementById('group-info-description').textContent = group.description || '(sem descrição)';
+        const membersEl = document.getElementById('group-info-members');
+        membersEl.innerHTML = '';
+        group.members.forEach((m) => {
+          const line = document.createElement('div');
+          line.className = 'member-line';
+          line.textContent = m.username + (m.role === 'adm' ? ' (admin)' : '');
+          membersEl.appendChild(line);
+        });
+        goTo('screen-group-info');
+      } catch (err) {
+        alert('Não foi possível carregar as informações do grupo.');
+      }
     }
 
     let chatContactOnline = false;
@@ -1266,6 +1853,13 @@
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
 
+      if (currentGroupId && !mine) {
+        const senderLabel = document.createElement('div');
+        senderLabel.className = 'bubble-sender';
+        senderLabel.textContent = msg.from_user;
+        bubble.appendChild(senderLabel);
+      }
+
       if (typeof msg.content === 'string' && msg.content.startsWith('data:image')) {
         const img = document.createElement('img');
         img.src = msg.content;
@@ -1276,7 +1870,9 @@
         audio.src = msg.content;
         bubble.appendChild(audio);
       } else {
-        bubble.textContent = msg.content;
+        const text = document.createElement('div');
+        text.textContent = msg.content;
+        bubble.appendChild(text);
       }
 
       row.appendChild(bubble);
@@ -1291,7 +1887,17 @@
     function sendMessage() {
       const input = document.getElementById('message-input');
       const content = input.value.trim();
-      if (!content || !currentChatUser || !socket) return;
+      if (!content || !socket) return;
+
+      if (currentGroupId) {
+        socket.emit('sendGroupMessage', { groupId: currentGroupId, content });
+        appendBubble({ from_user: myUsername, content });
+        scrollToBottom();
+        input.value = '';
+        return;
+      }
+
+      if (!currentChatUser) return;
       socket.emit('sendMessage', { to: currentChatUser, content });
       appendBubble({ from_user: myUsername, content });
       scrollToBottom();
@@ -1819,6 +2425,21 @@
         }
       });
 
+      socket.on('groupMessage', (msg) => {
+        if (currentGroupId === msg.group_id && msg.from_user !== myUsername) {
+          appendBubble(msg);
+          scrollToBottom();
+        }
+        if (msg.from_user !== myUsername) {
+          playMessageSound();
+          const groupInfo = groups.find((g) => g.id === msg.group_id);
+          showBrowserNotification(
+            (groupInfo ? groupInfo.name : 'Grupo') + ' — ' + msg.from_user,
+            msg.content.startsWith('data:image') ? '📷 Foto' : msg.content.startsWith('data:audio') ? '🎤 Áudio' : msg.content
+          );
+        }
+      });
+
       // --- Sinalização de chamada ---
       socket.on('call:offer', ({ from, offer, callType }) => {
         if (callState !== 'idle') {
@@ -1864,12 +2485,100 @@
       });
     }
 
+    // ---------- Grupos: carregar lista e criar novo ----------
+    async function loadGroups() {
+      try {
+        const res = await fetch('/api/groups', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+          groups = await res.json();
+          renderContacts();
+        }
+      } catch (err) { /* segue sem grupos se der erro de rede */ }
+    }
+
+    function openCreateGroupScreen() {
+      document.getElementById('group-name-input').value = '';
+      document.getElementById('group-description-input').value = '';
+      document.getElementById('group-error').textContent = '';
+      pendingGroupAvatarDataUrl = null;
+      const avatarBtn = document.getElementById('group-avatar-btn');
+      avatarBtn.innerHTML = 'CARREGA<br/>FOTO';
+
+      document.querySelectorAll('input[name="group-permission"]').forEach((r) => { r.checked = r.value === 'participante'; });
+
+      const membersList = document.getElementById('group-members-list');
+      membersList.innerHTML = '';
+      if (contacts.length === 0) {
+        membersList.innerHTML = '<p class="empty-contacts" style="padding:14px;">Você ainda não tem contatos pra adicionar ao grupo.</p>';
+      } else {
+        contacts.forEach((c) => {
+          const row = document.createElement('label');
+          row.className = 'group-member-row';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = c.username;
+          checkbox.className = 'group-member-checkbox';
+          const span = document.createElement('span');
+          span.textContent = c.username;
+          row.appendChild(checkbox);
+          row.appendChild(span);
+          membersList.appendChild(row);
+        });
+      }
+
+      goTo('screen-create-group');
+    }
+
+    async function onGroupAvatarSelected(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      pendingGroupAvatarDataUrl = await resizeImage(file, 300, 0.85);
+      const btn = document.getElementById('group-avatar-btn');
+      btn.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = pendingGroupAvatarDataUrl;
+      btn.appendChild(img);
+    }
+
+    async function createGroup() {
+      const errorEl = document.getElementById('group-error');
+      errorEl.textContent = '';
+      const name = document.getElementById('group-name-input').value.trim();
+      const description = document.getElementById('group-description-input').value.trim();
+      const permission = document.querySelector('input[name="group-permission"]:checked').value;
+      const members = Array.from(document.querySelectorAll('.group-member-checkbox:checked')).map((el) => el.value);
+
+      if (!name) {
+        errorEl.textContent = 'Dê um nome ao grupo.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ name, description, avatar: pendingGroupAvatarDataUrl, permission, members }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Não foi possível criar o grupo.';
+          return;
+        }
+        await loadGroups();
+        goTo('screen-main');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
     // ---------- Inicialização ----------
     if (token && myUsername) {
       requestNotificationPermission();
       connectSocket();
       renderContacts();
       renderTopbarProfile();
+      loadGroups();
       goTo('screen-main');
     }
   </script>
