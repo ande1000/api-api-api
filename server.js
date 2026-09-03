@@ -684,12 +684,24 @@ app.post('/api/groups', requireAuth, (req, res) => {
     }
   });
 
-  // Coloca todo mundo que está com o app aberto agora na sala do grupo, pra
-  // receber mensagens em tempo real imediatamente.
+  // Coloca todo mundo que está com o app aberto agora na sala do grupo, avisa
+  // em tempo real (o grupo aparece na hora, sem precisar recarregar a página),
+  // e manda notificação push pra quem está offline.
   const allMembers = listGroupMembers.all(groupId);
+  const groupPayload = { id: groupId, name, description, avatar, permission, createdBy: req.username };
   allMembers.forEach((m) => {
+    if (m.username === req.username) return; // quem criou já recebe na resposta HTTP
     const socketId = onlineUsers.get(m.username);
-    if (socketId) io.sockets.sockets.get(socketId)?.join(`group:${groupId}`);
+    if (socketId) {
+      io.sockets.sockets.get(socketId)?.join(`group:${groupId}`);
+      io.to(socketId).emit('groupAdded', groupPayload);
+    } else {
+      sendPushToUser(m.username, {
+        type: 'message',
+        title: name,
+        body: `${req.username} te adicionou a esse grupo`,
+      });
+    }
   });
 
   res.status(201).json({ id: groupId, name, description, avatar, permission, members: allMembers });
