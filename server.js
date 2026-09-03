@@ -54,6 +54,54 @@ db.exec(`
     subscription TEXT NOT NULL,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS user_settings (
+    username TEXT PRIMARY KEY,
+    welcome_enabled INTEGER DEFAULT 0,
+    welcome_message TEXT DEFAULT ''
+  );
+
+  CREATE TABLE IF NOT EXISTS blocked_users (
+    blocker TEXT NOT NULL,
+    blocked TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (blocker, blocked)
+  );
+
+  CREATE TABLE IF NOT EXISTS scheduled_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user TEXT NOT NULL,
+    to_user TEXT NOT NULL,
+    content TEXT NOT NULL,
+    send_at TEXT NOT NULL,
+    sent INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS groups_table (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    avatar TEXT,
+    created_by TEXT NOT NULL,
+    permission TEXT DEFAULT 'participante',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS group_members (
+    group_id INTEGER NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT DEFAULT 'participante',
+    PRIMARY KEY (group_id, username)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL,
+    from_user TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Se o banco já existia de uma versão anterior (sem a coluna avatar), adiciona agora.
@@ -89,6 +137,10 @@ const deleteConversation = db.prepare(`
   DELETE FROM messages
   WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
 `);
+const countMessagesBetween = db.prepare(`
+  SELECT COUNT(*) AS total FROM messages
+  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
+`);
 
 const savePushSubscription = db.prepare(`
   INSERT INTO push_subscriptions (username, subscription, updated_at)
@@ -97,6 +149,53 @@ const savePushSubscription = db.prepare(`
 `);
 const getPushSubscription = db.prepare(`SELECT subscription FROM push_subscriptions WHERE username = ?`);
 const deletePushSubscription = db.prepare(`DELETE FROM push_subscriptions WHERE username = ?`);
+
+// --- Configurações do usuário (mensagem de boas-vindas) ---
+const getUserSettings = db.prepare(`SELECT * FROM user_settings WHERE username = ?`);
+const upsertUserSettings = db.prepare(`
+  INSERT INTO user_settings (username, welcome_enabled, welcome_message)
+  VALUES (?, ?, ?)
+  ON CONFLICT(username) DO UPDATE SET welcome_enabled = excluded.welcome_enabled, welcome_message = excluded.welcome_message
+`);
+
+// --- Bloqueio de usuários ---
+const insertBlock = db.prepare(`INSERT OR IGNORE INTO blocked_users (blocker, blocked) VALUES (?, ?)`);
+const getBlock = db.prepare(`SELECT 1 FROM blocked_users WHERE blocker = ? AND blocked = ?`);
+const listBlocked = db.prepare(`SELECT blocked FROM blocked_users WHERE blocker = ? ORDER BY created_at DESC`);
+
+// --- Mensagens agendadas ---
+const insertScheduled = db.prepare(`
+  INSERT INTO scheduled_messages (from_user, to_user, content, send_at) VALUES (?, ?, ?, ?)
+`);
+const listScheduled = db.prepare(`
+  SELECT * FROM scheduled_messages WHERE from_user = ? AND sent = 0 ORDER BY send_at ASC
+`);
+const deleteScheduled = db.prepare(`DELETE FROM scheduled_messages WHERE id = ? AND from_user = ?`);
+const getDueScheduled = db.prepare(`
+  SELECT * FROM scheduled_messages WHERE sent = 0 AND send_at <= ?
+`);
+const markScheduledSent = db.prepare(`UPDATE scheduled_messages SET sent = 1 WHERE id = ?`);
+
+// --- Grupos ---
+const insertGroup = db.prepare(`
+  INSERT INTO groups_table (name, description, avatar, created_by, permission) VALUES (?, ?, ?, ?, ?)
+`);
+const getGroup = db.prepare(`SELECT * FROM groups_table WHERE id = ?`);
+const insertGroupMember = db.prepare(`INSERT OR IGNORE INTO group_members (group_id, username, role) VALUES (?, ?, ?)`);
+const getGroupMember = db.prepare(`SELECT * FROM group_members WHERE group_id = ? AND username = ?`);
+const listGroupMembers = db.prepare(`SELECT username, role FROM group_members WHERE group_id = ?`);
+const listMyGroups = db.prepare(`
+  SELECT g.* FROM groups_table g
+  JOIN group_members m ON m.group_id = g.id
+  WHERE m.username = ?
+  ORDER BY g.created_at DESC
+`);
+const insertGroupMessage = db.prepare(`
+  INSERT INTO group_messages (group_id, from_user, content) VALUES (?, ?, ?)
+`);
+const getGroupMessages = db.prepare(`
+  SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC
+`);
 
 // Envia uma notificação push para um usuário, se ele tiver se inscrito.
 // Isso funciona mesmo com o app fechado ou a tela do celular apagada.
@@ -197,14 +296,27 @@ app.get('/api/exists/:username', (req, res) => {
 
 // Devolve os dados públicos de um usuário: nome, foto de perfil e se está online agora.
 // Usado para mostrar a foto/status na lista de contatos e no topo da conversa.
+// Se vier um token junto (opcional), também informa se VOCÊ bloqueou essa pessoa.
 app.get('/api/user/:username', (req, res) => {
   const username = normalizeUsername(req.params.username);
   const user = findUser.get(username);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+  let blockedByMe = false;
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      blockedByMe = !!getBlock.get(payload.username, username);
+    } catch (err) { /* token inválido, apenas ignora o campo blockedByMe */ }
+  }
+
   res.json({
     username: user.username,
     avatar: user.avatar || null,
     online: onlineUsers.has(username),
+    blockedByMe,
   });
 });
 
@@ -268,6 +380,15 @@ app.post('/api/login', (req, res) => {
 const onlineUsers = new Map();
 
 function deliverMessage(from, to, content) {
+  // Se o destinatário bloqueou quem está enviando, a mensagem nem chega a ser salva.
+  if (getBlock.get(to, from)) {
+    return null;
+  }
+
+  // Antes de inserir, verifica se essa é a primeira mensagem entre os dois
+  // (para decidir se deve disparar a mensagem de boas-vindas do destinatário).
+  const isFirstMessage = countMessagesBetween.get(from, to, to, from).total === 0;
+
   const targetSocketId = onlineUsers.get(to);
   const delivered = !!targetSocketId;
 
@@ -290,6 +411,14 @@ function deliverMessage(from, to, content) {
       title: from,
       body: content.startsWith('data:image') ? '📷 Foto' : content.startsWith('data:audio') ? '🎤 Áudio' : content,
     });
+  }
+
+  // Mensagem de boas-vindas automática (só na primeira mensagem que a pessoa recebe de alguém)
+  if (isFirstMessage) {
+    const settings = getUserSettings.get(to);
+    if (settings && settings.welcome_enabled && settings.welcome_message) {
+      deliverMessage(to, from, settings.welcome_message);
+    }
   }
 
   return message;
@@ -317,6 +446,10 @@ io.on('connection', (socket) => {
   console.log(`[online] ${username}`);
   io.emit('presence', { username, online: true });
 
+  // Entra nas salas dos grupos que participa, pra receber mensagens em tempo real
+  const myGroups = listMyGroups.all(username);
+  myGroups.forEach((g) => socket.join(`group:${g.id}`));
+
   // Entrega mensagens que chegaram enquanto o usuário estava offline
   const pending = getPending.all(username);
   pending.forEach((msg) => {
@@ -329,6 +462,12 @@ io.on('connection', (socket) => {
     const toNormalized = normalizeUsername(to);
     if (!toNormalized || !content) return;
     deliverMessage(username, toNormalized, content);
+  });
+
+  // Envio de mensagem em um grupo
+  socket.on('sendGroupMessage', ({ groupId, content }) => {
+    if (!groupId || !content) return;
+    sendGroupMessage(Number(groupId), username, content);
   });
 
   socket.on('disconnect', () => {
@@ -387,6 +526,9 @@ app.post('/messages', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Campos obrigatórios: to, content' });
   }
   const message = deliverMessage(req.username, to, content);
+  if (!message) {
+    return res.status(403).json({ error: 'Não foi possível entregar a mensagem' });
+  }
   res.status(201).json(message);
 });
 
@@ -432,6 +574,226 @@ app.post('/api/push/subscribe', requireAuth, (req, res) => {
 app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
   deletePushSubscription.run(req.username);
   res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Bloqueio de usuários
+// ---------------------------------------------------------------------------
+
+// Bloqueia um usuário permanentemente (você não pode mais adicioná-lo, e
+// mensagens que ele mandar pra você deixam de ser entregues).
+app.post('/api/block', requireAuth, (req, res) => {
+  const target = normalizeUsername(req.body.username);
+  if (!target) return res.status(400).json({ error: 'Informe um nome de usuário' });
+  if (target === req.username) return res.status(400).json({ error: 'Você não pode bloquear a si mesmo' });
+  insertBlock.run(req.username, target);
+  res.json({ ok: true });
+});
+
+// Lista quem você já bloqueou
+app.get('/api/blocked', requireAuth, (req, res) => {
+  res.json(listBlocked.all(req.username).map((r) => r.blocked));
+});
+
+// ---------------------------------------------------------------------------
+// Configurações do usuário: mensagem de boas-vindas
+// ---------------------------------------------------------------------------
+
+app.get('/api/settings', requireAuth, (req, res) => {
+  const settings = getUserSettings.get(req.username);
+  res.json({
+    welcomeEnabled: settings ? !!settings.welcome_enabled : false,
+    welcomeMessage: settings ? settings.welcome_message : '',
+  });
+});
+
+app.post('/api/settings', requireAuth, (req, res) => {
+  const welcomeEnabled = req.body.welcomeEnabled ? 1 : 0;
+  const welcomeMessage = typeof req.body.welcomeMessage === 'string' ? req.body.welcomeMessage : '';
+  upsertUserSettings.run(req.username, welcomeEnabled, welcomeMessage);
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Agendamento de mensagens
+// ---------------------------------------------------------------------------
+
+// Cria uma mensagem agendada. sendAt deve vir no formato ISO (ex: "2026-09-10T14:30")
+app.post('/api/scheduled-messages', requireAuth, (req, res) => {
+  const to = normalizeUsername(req.body.to);
+  const { content, sendAt } = req.body;
+  if (!to || !content || !sendAt) {
+    return res.status(400).json({ error: 'Campos obrigatórios: to, content, sendAt' });
+  }
+  const sendDate = new Date(sendAt);
+  if (isNaN(sendDate.getTime())) {
+    return res.status(400).json({ error: 'Data/hora inválida' });
+  }
+  const result = insertScheduled.run(req.username, to, content, sendDate.toISOString());
+  res.status(201).json({ id: result.lastInsertRowid });
+});
+
+// Lista suas mensagens agendadas que ainda não foram enviadas
+app.get('/api/scheduled-messages', requireAuth, (req, res) => {
+  res.json(listScheduled.all(req.username));
+});
+
+// Cancela uma mensagem agendada
+app.delete('/api/scheduled-messages/:id', requireAuth, (req, res) => {
+  deleteScheduled.run(req.params.id, req.username);
+  res.json({ ok: true });
+});
+
+// A cada 30 segundos, verifica se alguma mensagem agendada já venceu e envia
+setInterval(() => {
+  const due = getDueScheduled.all(new Date().toISOString());
+  due.forEach((msg) => {
+    deliverMessage(msg.from_user, msg.to_user, msg.content);
+    markScheduledSent.run(msg.id);
+  });
+}, 30 * 1000);
+
+// ---------------------------------------------------------------------------
+// Grupos
+// ---------------------------------------------------------------------------
+
+function normalizeGroupMemberList(list) {
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((u) => normalizeUsername(u)).filter(Boolean))];
+}
+
+// Cria um grupo. Quem cria vira administrador automaticamente.
+// body: { name, description, avatar, permission: 'adm'|'participante', members: [usernames] }
+app.post('/api/groups', requireAuth, (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const description = String(req.body.description || '').trim();
+  const avatar = typeof req.body.avatar === 'string' ? req.body.avatar : null;
+  const permission = req.body.permission === 'adm' ? 'adm' : 'participante';
+
+  if (!name) return res.status(400).json({ error: 'O grupo precisa de um nome' });
+
+  const result = insertGroup.run(name, description, avatar, req.username, permission);
+  const groupId = result.lastInsertRowid;
+
+  insertGroupMember.run(groupId, req.username, 'adm');
+
+  const members = normalizeGroupMemberList(req.body.members).filter((u) => u !== req.username);
+  members.forEach((member) => {
+    if (findUser.get(member)) {
+      insertGroupMember.run(groupId, member, 'participante');
+    }
+  });
+
+  // Coloca todo mundo que está com o app aberto agora na sala do grupo, pra
+  // receber mensagens em tempo real imediatamente.
+  const allMembers = listGroupMembers.all(groupId);
+  allMembers.forEach((m) => {
+    const socketId = onlineUsers.get(m.username);
+    if (socketId) io.sockets.sockets.get(socketId)?.join(`group:${groupId}`);
+  });
+
+  res.status(201).json({ id: groupId, name, description, avatar, permission, members: allMembers });
+});
+
+// Lista os grupos que eu participo
+app.get('/api/groups', requireAuth, (req, res) => {
+  const groups = listMyGroups.all(req.username);
+  res.json(groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    avatar: g.avatar,
+    permission: g.permission,
+    createdBy: g.created_by,
+  })));
+});
+
+// Detalhes de um grupo (exige ser membro)
+app.get('/api/groups/:id', requireAuth, (req, res) => {
+  const groupId = Number(req.params.id);
+  const group = getGroup.get(groupId);
+  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
+  if (!getGroupMember.get(groupId, req.username)) {
+    return res.status(403).json({ error: 'Você não é membro desse grupo' });
+  }
+  const members = listGroupMembers.all(groupId);
+  res.json({
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    avatar: group.avatar,
+    permission: group.permission,
+    createdBy: group.created_by,
+    members,
+  });
+});
+
+// Histórico de mensagens do grupo (exige ser membro)
+app.get('/api/groups/:id/messages', requireAuth, (req, res) => {
+  const groupId = Number(req.params.id);
+  if (!getGroupMember.get(groupId, req.username)) {
+    return res.status(403).json({ error: 'Você não é membro desse grupo' });
+  }
+  res.json(getGroupMessages.all(groupId));
+});
+
+function sendGroupMessage(groupId, fromUser, content) {
+  const group = getGroup.get(groupId);
+  if (!group) return { error: 'Grupo não encontrado' };
+
+  const member = getGroupMember.get(groupId, fromUser);
+  if (!member) return { error: 'Você não é membro desse grupo' };
+
+  if (group.permission === 'adm' && member.role !== 'adm') {
+    return { error: 'Só administradores podem enviar mensagens nesse grupo' };
+  }
+
+  const result = insertGroupMessage.run(groupId, fromUser, content);
+  const message = {
+    id: result.lastInsertRowid,
+    group_id: groupId,
+    from_user: fromUser,
+    content,
+    created_at: new Date().toISOString(),
+  };
+  io.to(`group:${groupId}`).emit('groupMessage', message);
+
+  // Notifica por push quem não está com o app aberto
+  const members = listGroupMembers.all(groupId);
+  members.forEach((m) => {
+    if (m.username !== fromUser && !onlineUsers.has(m.username)) {
+      sendPushToUser(m.username, {
+        type: 'message',
+        title: `${group.name} (grupo)`,
+        body: `${fromUser}: ${content.startsWith('data:image') ? '📷 Foto' : content.startsWith('data:audio') ? '🎤 Áudio' : content}`,
+      });
+    }
+  });
+
+  return { message };
+}
+
+// Envio de mensagem em grupo via REST (alternativa ao socket)
+app.post('/api/groups/:id/messages', requireAuth, (req, res) => {
+  const groupId = Number(req.params.id);
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'Campo obrigatório: content' });
+
+  const result = sendGroupMessage(groupId, req.username, content);
+  if (result.error) return res.status(403).json({ error: result.error });
+  res.status(201).json(result.message);
+});
+
+// ---------------------------------------------------------------------------
+// Sobre o app
+// ---------------------------------------------------------------------------
+app.get('/api/about', (req, res) => {
+  res.json({
+    name: 'whats web app',
+    version: '1.0',
+    createdYear: 2026,
+    createdBy: 'Eduardo Neves Costa',
+  });
 });
 
 // Qualquer rota que não seja da API cai na tela principal do whats web app
