@@ -535,6 +535,13 @@
   }
 
   /* ---------- Criar grupo / info do grupo ---------- */
+  .group-add-member-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+  }
+  .group-add-member-row .field { flex: 1; }
   .group-members-list {
     width: 100%;
     max-width: 320px;
@@ -1034,6 +1041,12 @@
     <button class="photo-picker settings-avatar-big" id="group-avatar-btn" onclick="document.getElementById('group-avatar-input').click()">CARREGA<br/>FOTO</button>
     <input type="file" id="group-avatar-input" accept="image/*" style="display:none" onchange="onGroupAvatarSelected(event)" />
     <textarea class="field settings-textarea" id="group-description-input" placeholder="criar uma descrição" rows="3"></textarea>
+    <h2 class="settings-heading" style="font-size:0.95rem;">ADICIONAR PARTICIPANTES</h2>
+    <div class="group-add-member-row">
+      <input class="field" id="group-add-member-input" placeholder="nome do usuário" autocomplete="off" />
+      <button class="btn-green" style="padding:0 18px;" onclick="addGroupMemberByUsername()">Add</button>
+    </div>
+    <p class="error-text" id="group-member-error"></p>
     <div id="group-members-list" class="group-members-list"></div>
     <h2 class="settings-heading" style="font-size:0.95rem;">QUEM PODE ENVIAR MENSAGEM</h2>
     <div class="permission-row">
@@ -2509,6 +2522,8 @@
       document.getElementById('group-name-input').value = '';
       document.getElementById('group-description-input').value = '';
       document.getElementById('group-error').textContent = '';
+      document.getElementById('group-member-error').textContent = '';
+      document.getElementById('group-add-member-input').value = '';
       pendingGroupAvatarDataUrl = null;
       const avatarBtn = document.getElementById('group-avatar-btn');
       avatarBtn.innerHTML = 'CARREGA<br/>FOTO';
@@ -2518,7 +2533,7 @@
       const membersList = document.getElementById('group-members-list');
       membersList.innerHTML = '';
       if (contacts.length === 0) {
-        membersList.innerHTML = '<p class="empty-contacts" style="padding:14px;">Você ainda não tem contatos pra adicionar ao grupo.</p>';
+        membersList.innerHTML = '<p class="empty-contacts" style="padding:14px;">Nenhum contato salvo ainda — use o campo acima pra adicionar pelo nome de usuário.</p>';
       } else {
         contacts.forEach((c) => {
           const row = document.createElement('label');
@@ -2536,6 +2551,58 @@
       }
 
       goTo('screen-create-group');
+    }
+
+    // Adiciona qualquer usuário (mesmo que não seja um contato salvo) à lista
+    // de participantes do grupo, depois de confirmar que ele existe de verdade.
+    async function addGroupMemberByUsername() {
+      const input = document.getElementById('group-add-member-input');
+      const errorEl = document.getElementById('group-member-error');
+      errorEl.textContent = '';
+      const username = normalize(input.value);
+      if (!username) return;
+
+      if (username === myUsername) {
+        errorEl.textContent = 'Você já participa automaticamente, não precisa se adicionar.';
+        return;
+      }
+
+      const existing = document.querySelector('.group-member-checkbox[value="' + CSS.escape(username) + '"]');
+      if (existing) {
+        existing.checked = true;
+        input.value = '';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/user/' + encodeURIComponent(username));
+        if (res.status === 404) {
+          errorEl.textContent = 'Esse usuário não existe.';
+          return;
+        }
+        const profile = await res.json();
+
+        const membersList = document.getElementById('group-members-list');
+        const emptyMsg = membersList.querySelector('.empty-contacts');
+        if (emptyMsg) emptyMsg.remove();
+
+        const row = document.createElement('label');
+        row.className = 'group-member-row';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = profile.username;
+        checkbox.className = 'group-member-checkbox';
+        checkbox.checked = true;
+        const span = document.createElement('span');
+        span.textContent = profile.username;
+        row.appendChild(checkbox);
+        row.appendChild(span);
+        membersList.appendChild(row);
+
+        input.value = '';
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
     }
 
     async function onGroupAvatarSelected(event) {
@@ -2561,6 +2628,10 @@
       if (!name) {
         errorEl.textContent = 'Dê um nome ao grupo.';
         return;
+      }
+
+      if (members.length === 0) {
+        if (!confirm('Você não adicionou nenhum participante. Criar o grupo só com você por enquanto?')) return;
       }
 
       try {
