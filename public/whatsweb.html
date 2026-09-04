@@ -591,6 +591,50 @@
   }
   .group-info-content .member-line { padding: 3px 0; }
 
+  /* Versão compacta da tela de criar grupo, pra caber tudo sem precisar rolar */
+  #screen-create-group {
+    padding: 30px 20px 16px;
+    gap: 6px;
+  }
+  #screen-create-group h1 {
+    font-size: 1.05rem;
+    margin: 0 0 2px;
+  }
+  #screen-create-group .field {
+    padding: 9px 14px;
+    font-size: 0.85rem;
+  }
+  #screen-create-group .settings-avatar-big {
+    width: 60px;
+    height: 60px;
+    font-size: 0.6rem;
+    margin: 2px 0;
+  }
+  #screen-create-group .settings-heading {
+    margin: 4px 0 0;
+    font-size: 0.8rem !important;
+  }
+  #screen-create-group .group-add-member-row .field {
+    padding: 9px 14px;
+  }
+  #screen-create-group .group-add-member-row button {
+    font-size: 0.85rem;
+  }
+  #screen-create-group .group-members-list {
+    max-height: 70px;
+  }
+  #screen-create-group .group-member-row {
+    padding: 5px 12px;
+    font-size: 0.8rem;
+  }
+  #screen-create-group .permission-row { gap: 16px; }
+  #screen-create-group .permission-option { font-size: 0.82rem; }
+  #screen-create-group .btn-green {
+    padding: 9px 24px;
+    font-size: 0.9rem;
+  }
+  #screen-create-group .error-text { min-height: 0; margin: 0; }
+
   /* ---------- Conversa ---------- */
   #screen-chat { background: var(--grey-dark); }
   .chat-topbar {
@@ -1041,7 +1085,7 @@
     <input class="field" id="group-name-input" placeholder="crie um nome" autocomplete="off" />
     <button class="photo-picker settings-avatar-big" id="group-avatar-btn" onclick="document.getElementById('group-avatar-input').click()">CARREGA<br/>FOTO</button>
     <input type="file" id="group-avatar-input" accept="image/*" style="display:none" onchange="onGroupAvatarSelected(event)" />
-    <textarea class="field settings-textarea" id="group-description-input" placeholder="criar uma descrição" rows="3"></textarea>
+    <textarea class="field settings-textarea" id="group-description-input" placeholder="criar uma descrição" rows="2"></textarea>
     <h2 class="settings-heading" style="font-size:0.95rem;">ADICIONAR PARTICIPANTES</h2>
     <div class="group-add-member-row">
       <input class="field" id="group-add-member-input" placeholder="nome do usuário" autocomplete="off" />
