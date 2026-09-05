@@ -2694,6 +2694,9 @@
           errorEl.textContent = data.error || 'Não foi possível criar o grupo.';
           return;
         }
+        // --- DEBUG TEMPORÁRIO ---
+        alert('DEBUG SERVIDOR:\n' + JSON.stringify(data.debug, null, 2));
+        // --- FIM DEBUG ---
         await loadGroups();
         goTo('screen-main');
       } catch (err) {
