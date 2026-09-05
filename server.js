@@ -678,11 +678,17 @@ app.post('/api/groups', requireAuth, (req, res) => {
   insertGroupMember.run(groupId, req.username, 'adm');
 
   const members = normalizeGroupMemberList(req.body.members).filter((u) => u !== req.username);
+  // --- DEBUG TEMPORÁRIO ---
+  const debugInfo = { rawMembers: req.body.members, normalizedMembers: members, lookups: [] };
   members.forEach((member) => {
-    if (findUser.get(member)) {
-      insertGroupMember.run(groupId, member, 'participante');
+    const found = findUser.get(member);
+    debugInfo.lookups.push({ member, found: !!found });
+    if (found) {
+      const insertResult = insertGroupMember.run(groupId, member, 'participante');
+      debugInfo.lookups[debugInfo.lookups.length - 1].insertedChanges = insertResult.changes;
     }
   });
+  // --- FIM DEBUG ---
 
   // Coloca todo mundo que está com o app aberto agora na sala do grupo, avisa
   // em tempo real (o grupo aparece na hora, sem precisar recarregar a página),
@@ -704,7 +710,7 @@ app.post('/api/groups', requireAuth, (req, res) => {
     }
   });
 
-  res.status(201).json({ id: groupId, name, description, avatar, permission, members: allMembers });
+  res.status(201).json({ id: groupId, name, description, avatar, permission, members: allMembers, debug: debugInfo });
 });
 
 // Lista os grupos que eu participo
