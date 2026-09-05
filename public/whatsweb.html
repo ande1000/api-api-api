@@ -2670,10 +2670,6 @@
       const permission = document.querySelector('input[name="group-permission"]:checked').value;
       const members = Array.from(document.querySelectorAll('.group-member-checkbox:checked')).map((el) => el.value);
 
-      // --- DEBUG TEMPORÁRIO: mostra quem está marcado antes de enviar ---
-      alert('DEBUG - Participantes marcados: ' + JSON.stringify(members) + '\n\nTotal de caixinhas na tela: ' + document.querySelectorAll('.group-member-checkbox').length);
-      // --- FIM DEBUG ---
-
       if (!name) {
         errorEl.textContent = 'Dê um nome ao grupo.';
         return;
@@ -2689,18 +2685,20 @@
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ name, description, avatar: pendingGroupAvatarDataUrl, permission, members }),
         });
-        const data = await res.json();
+        const rawText = await res.text();
+        // --- DEBUG TEMPORÁRIO: mostra a resposta crua, antes de qualquer verificação ---
+        alert('DEBUG RESPOSTA CRUA\nStatus: ' + res.status + '\n\n' + rawText.slice(0, 800));
+        // --- FIM DEBUG ---
+        const data = JSON.parse(rawText);
         if (!res.ok) {
           errorEl.textContent = data.error || 'Não foi possível criar o grupo.';
           return;
         }
-        // --- DEBUG TEMPORÁRIO ---
-        alert('DEBUG SERVIDOR:\n' + JSON.stringify(data.debug, null, 2));
-        // --- FIM DEBUG ---
         await loadGroups();
         goTo('screen-main');
       } catch (err) {
         errorEl.textContent = 'Erro de conexão. Tente novamente.';
+        alert('DEBUG ERRO CAPTURADO: ' + err.message);
       }
     }
 
