@@ -2670,6 +2670,10 @@
       const permission = document.querySelector('input[name="group-permission"]:checked').value;
       const members = Array.from(document.querySelectorAll('.group-member-checkbox:checked')).map((el) => el.value);
 
+      // --- DEBUG TEMPORÁRIO: mostra quem está marcado antes de enviar ---
+      alert('DEBUG - Participantes marcados: ' + JSON.stringify(members) + '\n\nTotal de caixinhas na tela: ' + document.querySelectorAll('.group-member-checkbox').length);
+      // --- FIM DEBUG ---
+
       if (!name) {
         errorEl.textContent = 'Dê um nome ao grupo.';
         return;
