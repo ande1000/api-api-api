@@ -2686,10 +2686,14 @@
           body: JSON.stringify({ name, description, avatar: pendingGroupAvatarDataUrl, permission, members }),
         });
         const rawText = await res.text();
-        // --- DEBUG TEMPORÁRIO: mostra a resposta crua, antes de qualquer verificação ---
-        alert('DEBUG RESPOSTA CRUA\nStatus: ' + res.status + '\n\n' + rawText.slice(0, 800));
-        // --- FIM DEBUG ---
         const data = JSON.parse(rawText);
+        // --- DEBUG TEMPORÁRIO: mostra só o que interessa, sem a foto atrapalhando ---
+        alert(
+          'DEBUG\nStatus: ' + res.status +
+          '\n\nmembers (quem ficou no grupo):\n' + JSON.stringify(data.members, null, 2) +
+          '\n\ndebug (o que o servidor recebeu e achou):\n' + JSON.stringify(data.debug, null, 2)
+        );
+        // --- FIM DEBUG ---
         if (!res.ok) {
           errorEl.textContent = data.error || 'Não foi possível criar o grupo.';
           return;
