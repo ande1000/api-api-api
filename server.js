@@ -77,31 +77,6 @@ db.exec(`
     sent INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
-
-  CREATE TABLE IF NOT EXISTS groups_table (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    avatar TEXT,
-    created_by TEXT NOT NULL,
-    permission TEXT DEFAULT 'participante',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS group_members (
-    group_id INTEGER NOT NULL,
-    username TEXT NOT NULL,
-    role TEXT DEFAULT 'participante',
-    PRIMARY KEY (group_id, username)
-  );
-
-  CREATE TABLE IF NOT EXISTS group_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id INTEGER NOT NULL,
-    from_user TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
 `);
 
 // Se o banco já existia de uma versão anterior (sem a coluna avatar), adiciona agora.
@@ -175,27 +150,6 @@ const getDueScheduled = db.prepare(`
   SELECT * FROM scheduled_messages WHERE sent = 0 AND send_at <= ?
 `);
 const markScheduledSent = db.prepare(`UPDATE scheduled_messages SET sent = 1 WHERE id = ?`);
-
-// --- Grupos ---
-const insertGroup = db.prepare(`
-  INSERT INTO groups_table (name, description, avatar, created_by, permission) VALUES (?, ?, ?, ?, ?)
-`);
-const getGroup = db.prepare(`SELECT * FROM groups_table WHERE id = ?`);
-const insertGroupMember = db.prepare(`INSERT OR IGNORE INTO group_members (group_id, username, role) VALUES (?, ?, ?)`);
-const getGroupMember = db.prepare(`SELECT * FROM group_members WHERE group_id = ? AND username = ?`);
-const listGroupMembers = db.prepare(`SELECT username, role FROM group_members WHERE group_id = ?`);
-const listMyGroups = db.prepare(`
-  SELECT g.* FROM groups_table g
-  JOIN group_members m ON m.group_id = g.id
-  WHERE m.username = ?
-  ORDER BY g.created_at DESC
-`);
-const insertGroupMessage = db.prepare(`
-  INSERT INTO group_messages (group_id, from_user, content) VALUES (?, ?, ?)
-`);
-const getGroupMessages = db.prepare(`
-  SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC
-`);
 
 // Envia uma notificação push para um usuário, se ele tiver se inscrito.
 // Isso funciona mesmo com o app fechado ou a tela do celular apagada.
@@ -446,10 +400,6 @@ io.on('connection', (socket) => {
   console.log(`[online] ${username}`);
   io.emit('presence', { username, online: true });
 
-  // Entra nas salas dos grupos que participa, pra receber mensagens em tempo real
-  const myGroups = listMyGroups.all(username);
-  myGroups.forEach((g) => socket.join(`group:${g.id}`));
-
   // Entrega mensagens que chegaram enquanto o usuário estava offline
   const pending = getPending.all(username);
   pending.forEach((msg) => {
@@ -462,12 +412,6 @@ io.on('connection', (socket) => {
     const toNormalized = normalizeUsername(to);
     if (!toNormalized || !content) return;
     deliverMessage(username, toNormalized, content);
-  });
-
-  // Envio de mensagem em um grupo
-  socket.on('sendGroupMessage', ({ groupId, content }) => {
-    if (!groupId || !content) return;
-    sendGroupMessage(Number(groupId), username, content);
   });
 
   socket.on('disconnect', () => {
@@ -652,155 +596,6 @@ setInterval(() => {
     markScheduledSent.run(msg.id);
   });
 }, 30 * 1000);
-
-// ---------------------------------------------------------------------------
-// Grupos
-// ---------------------------------------------------------------------------
-
-function normalizeGroupMemberList(list) {
-  if (!Array.isArray(list)) return [];
-  return [...new Set(list.map((u) => normalizeUsername(u)).filter(Boolean))];
-}
-
-// Cria um grupo. Quem cria vira administrador automaticamente.
-// body: { name, description, avatar, permission: 'adm'|'participante', members: [usernames] }
-app.post('/api/groups', requireAuth, (req, res) => {
-  const name = String(req.body.name || '').trim();
-  const description = String(req.body.description || '').trim();
-  const avatar = typeof req.body.avatar === 'string' ? req.body.avatar : null;
-  const permission = req.body.permission === 'adm' ? 'adm' : 'participante';
-
-  if (!name) return res.status(400).json({ error: 'O grupo precisa de um nome' });
-
-  const result = insertGroup.run(name, description, avatar, req.username, permission);
-  const groupId = result.lastInsertRowid;
-
-  insertGroupMember.run(groupId, req.username, 'adm');
-
-  const members = normalizeGroupMemberList(req.body.members).filter((u) => u !== req.username);
-  // --- DEBUG TEMPORÁRIO ---
-  const debugInfo = { rawMembers: req.body.members, normalizedMembers: members, lookups: [] };
-  members.forEach((member) => {
-    const found = findUser.get(member);
-    debugInfo.lookups.push({ member, found: !!found });
-    if (found) {
-      const insertResult = insertGroupMember.run(groupId, member, 'participante');
-      debugInfo.lookups[debugInfo.lookups.length - 1].insertedChanges = insertResult.changes;
-    }
-  });
-  // --- FIM DEBUG ---
-
-  // Coloca todo mundo que está com o app aberto agora na sala do grupo, avisa
-  // em tempo real (o grupo aparece na hora, sem precisar recarregar a página),
-  // e manda notificação push pra quem está offline.
-  const allMembers = listGroupMembers.all(groupId);
-  const groupPayload = { id: groupId, name, description, avatar, permission, createdBy: req.username };
-  allMembers.forEach((m) => {
-    if (m.username === req.username) return; // quem criou já recebe na resposta HTTP
-    const socketId = onlineUsers.get(m.username);
-    if (socketId) {
-      io.sockets.sockets.get(socketId)?.join(`group:${groupId}`);
-      io.to(socketId).emit('groupAdded', groupPayload);
-    } else {
-      sendPushToUser(m.username, {
-        type: 'message',
-        title: name,
-        body: `${req.username} te adicionou a esse grupo`,
-      });
-    }
-  });
-
-  res.status(201).json({ id: groupId, name, description, avatar, permission, members: allMembers, debug: debugInfo });
-});
-
-// Lista os grupos que eu participo
-app.get('/api/groups', requireAuth, (req, res) => {
-  const groups = listMyGroups.all(req.username);
-  res.json(groups.map((g) => ({
-    id: g.id,
-    name: g.name,
-    description: g.description,
-    avatar: g.avatar,
-    permission: g.permission,
-    createdBy: g.created_by,
-  })));
-});
-
-// Detalhes de um grupo (exige ser membro)
-app.get('/api/groups/:id', requireAuth, (req, res) => {
-  const groupId = Number(req.params.id);
-  const group = getGroup.get(groupId);
-  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
-  if (!getGroupMember.get(groupId, req.username)) {
-    return res.status(403).json({ error: 'Você não é membro desse grupo' });
-  }
-  const members = listGroupMembers.all(groupId);
-  res.json({
-    id: group.id,
-    name: group.name,
-    description: group.description,
-    avatar: group.avatar,
-    permission: group.permission,
-    createdBy: group.created_by,
-    members,
-  });
-});
-
-// Histórico de mensagens do grupo (exige ser membro)
-app.get('/api/groups/:id/messages', requireAuth, (req, res) => {
-  const groupId = Number(req.params.id);
-  if (!getGroupMember.get(groupId, req.username)) {
-    return res.status(403).json({ error: 'Você não é membro desse grupo' });
-  }
-  res.json(getGroupMessages.all(groupId));
-});
-
-function sendGroupMessage(groupId, fromUser, content) {
-  const group = getGroup.get(groupId);
-  if (!group) return { error: 'Grupo não encontrado' };
-
-  const member = getGroupMember.get(groupId, fromUser);
-  if (!member) return { error: 'Você não é membro desse grupo' };
-
-  if (group.permission === 'adm' && member.role !== 'adm') {
-    return { error: 'Só administradores podem enviar mensagens nesse grupo' };
-  }
-
-  const result = insertGroupMessage.run(groupId, fromUser, content);
-  const message = {
-    id: result.lastInsertRowid,
-    group_id: groupId,
-    from_user: fromUser,
-    content,
-    created_at: new Date().toISOString(),
-  };
-  io.to(`group:${groupId}`).emit('groupMessage', message);
-
-  // Notifica por push quem não está com o app aberto
-  const members = listGroupMembers.all(groupId);
-  members.forEach((m) => {
-    if (m.username !== fromUser && !onlineUsers.has(m.username)) {
-      sendPushToUser(m.username, {
-        type: 'message',
-        title: `${group.name} (grupo)`,
-        body: `${fromUser}: ${content.startsWith('data:image') ? '📷 Foto' : content.startsWith('data:audio') ? '🎤 Áudio' : content}`,
-      });
-    }
-  });
-
-  return { message };
-}
-
-// Envio de mensagem em grupo via REST (alternativa ao socket)
-app.post('/api/groups/:id/messages', requireAuth, (req, res) => {
-  const groupId = Number(req.params.id);
-  const { content } = req.body;
-  if (!content) return res.status(400).json({ error: 'Campo obrigatório: content' });
-
-  const result = sendGroupMessage(groupId, req.username, content);
-  if (result.error) return res.status(403).json({ error: result.error });
-  res.status(201).json(result.message);
-});
 
 // ---------------------------------------------------------------------------
 // Sobre o app
