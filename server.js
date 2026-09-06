@@ -85,6 +85,12 @@ try {
 } catch (err) {
   // Coluna já existe — tudo bem, ignora.
 }
+try {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN note TEXT DEFAULT ''`);
+} catch (err) { /* coluna já existe */ }
+try {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN pix_key TEXT DEFAULT ''`);
+} catch (err) { /* coluna já existe */ }
 
 const insertUser = db.prepare(`INSERT INTO users (username, password_hash, avatar) VALUES (?, ?, ?)`);
 const findUser = db.prepare(`SELECT * FROM users WHERE username = ?`);
@@ -125,12 +131,16 @@ const savePushSubscription = db.prepare(`
 const getPushSubscription = db.prepare(`SELECT subscription FROM push_subscriptions WHERE username = ?`);
 const deletePushSubscription = db.prepare(`DELETE FROM push_subscriptions WHERE username = ?`);
 
-// --- Configurações do usuário (mensagem de boas-vindas) ---
+// --- Configurações do usuário (mensagem de boas-vindas, bloco de nota, chave pix) ---
 const getUserSettings = db.prepare(`SELECT * FROM user_settings WHERE username = ?`);
 const upsertUserSettings = db.prepare(`
-  INSERT INTO user_settings (username, welcome_enabled, welcome_message)
-  VALUES (?, ?, ?)
-  ON CONFLICT(username) DO UPDATE SET welcome_enabled = excluded.welcome_enabled, welcome_message = excluded.welcome_message
+  INSERT INTO user_settings (username, welcome_enabled, welcome_message, note, pix_key)
+  VALUES (@username, @welcome_enabled, @welcome_message, @note, @pix_key)
+  ON CONFLICT(username) DO UPDATE SET
+    welcome_enabled = excluded.welcome_enabled,
+    welcome_message = excluded.welcome_message,
+    note = excluded.note,
+    pix_key = excluded.pix_key
 `);
 
 // --- Bloqueio de usuários ---
@@ -540,7 +550,7 @@ app.get('/api/blocked', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Configurações do usuário: mensagem de boas-vindas
+// Configurações do usuário: boas-vindas, bloco de nota, chave pix
 // ---------------------------------------------------------------------------
 
 app.get('/api/settings', requireAuth, (req, res) => {
@@ -548,13 +558,30 @@ app.get('/api/settings', requireAuth, (req, res) => {
   res.json({
     welcomeEnabled: settings ? !!settings.welcome_enabled : false,
     welcomeMessage: settings ? settings.welcome_message : '',
+    note: settings ? settings.note || '' : '',
+    pixKey: settings ? settings.pix_key || '' : '',
   });
 });
 
+// Salva só o(s) campo(s) enviado(s), mantendo os outros como estavam —
+// assim cada tela (boas-vindas, bloco de nota, chave pix) pode salvar sem
+// apagar o que as outras telas já tinham guardado.
 app.post('/api/settings', requireAuth, (req, res) => {
-  const welcomeEnabled = req.body.welcomeEnabled ? 1 : 0;
-  const welcomeMessage = typeof req.body.welcomeMessage === 'string' ? req.body.welcomeMessage : '';
-  upsertUserSettings.run(req.username, welcomeEnabled, welcomeMessage);
+  const current = getUserSettings.get(req.username) || {
+    welcome_enabled: 0,
+    welcome_message: '',
+    note: '',
+    pix_key: '',
+  };
+
+  upsertUserSettings.run({
+    username: req.username,
+    welcome_enabled: req.body.welcomeEnabled !== undefined ? (req.body.welcomeEnabled ? 1 : 0) : current.welcome_enabled,
+    welcome_message: req.body.welcomeMessage !== undefined ? req.body.welcomeMessage : current.welcome_message,
+    note: req.body.note !== undefined ? req.body.note : (current.note || ''),
+    pix_key: req.body.pixKey !== undefined ? req.body.pixKey : (current.pix_key || ''),
+  });
+
   res.json({ ok: true });
 });
 
