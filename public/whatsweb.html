@@ -232,17 +232,6 @@
     cursor: pointer;
   }
   .contact-row:active { background: #1a1a1a; }
-  .avatar-wrap { position: relative; flex-shrink: 0; }
-  .group-dot {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--red);
-    border: 2px solid var(--black);
-  }
   .avatar {
     width: 46px;
     height: 46px;
@@ -442,7 +431,7 @@
   .settings-menu-back { position: static; align-self: flex-start; color: var(--white); margin-top: 10px; }
 
   /* ---------- Telas simples de configuração (boas-vindas, agendar, bloquear, sobre) ---------- */
-  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-create-group, #screen-group-info {
+  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about {
     background: var(--black);
     align-items: center;
     padding: 60px 24px 24px;
@@ -450,7 +439,7 @@
     position: relative;
     overflow-y: auto;
   }
-  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-create-group h1 {
+  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1 {
     color: var(--white);
     font-size: 1.3rem;
     font-weight: 800;
@@ -534,106 +523,6 @@
     line-height: 1.8;
     font-size: 0.9rem;
   }
-
-  /* ---------- Criar grupo / info do grupo ---------- */
-  .group-add-member-row {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-    max-width: 320px;
-  }
-  .group-add-member-row .field { flex: 1; }
-  .group-members-list {
-    width: 100%;
-    max-width: 320px;
-    background: #1c1c1c;
-    border-radius: 8px;
-    max-height: 160px;
-    overflow-y: auto;
-    padding: 6px 0;
-  }
-  .group-member-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 14px;
-    color: var(--white);
-    font-size: 0.9rem;
-  }
-  .group-member-row input { flex-shrink: 0; }
-  .permission-row { display: flex; gap: 24px; }
-  .permission-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--white);
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .group-info-box {
-    width: 100%;
-    max-width: 340px;
-    margin-top: 10px;
-  }
-  .group-info-label {
-    color: var(--red);
-    font-weight: 800;
-    font-size: 0.8rem;
-    margin-bottom: 6px;
-  }
-  .group-info-content {
-    background: var(--white);
-    border-radius: 8px;
-    padding: 12px 14px;
-    color: var(--black);
-    font-size: 0.85rem;
-    min-height: 40px;
-  }
-  .group-info-content .member-line { padding: 3px 0; }
-
-  /* Versão compacta da tela de criar grupo, pra caber tudo sem precisar rolar */
-  #screen-create-group {
-    padding: 30px 20px 16px;
-    gap: 6px;
-  }
-  #screen-create-group h1 {
-    font-size: 1.05rem;
-    margin: 0 0 2px;
-  }
-  #screen-create-group .field {
-    padding: 9px 14px;
-    font-size: 0.85rem;
-  }
-  #screen-create-group .settings-avatar-big {
-    width: 60px;
-    height: 60px;
-    font-size: 0.6rem;
-    margin: 2px 0;
-  }
-  #screen-create-group .settings-heading {
-    margin: 4px 0 0;
-    font-size: 0.8rem !important;
-  }
-  #screen-create-group .group-add-member-row .field {
-    padding: 9px 14px;
-  }
-  #screen-create-group .group-add-member-row button {
-    font-size: 0.85rem;
-  }
-  #screen-create-group .group-members-list {
-    max-height: 70px;
-  }
-  #screen-create-group .group-member-row {
-    padding: 5px 12px;
-    font-size: 0.8rem;
-  }
-  #screen-create-group .permission-row { gap: 16px; }
-  #screen-create-group .permission-option { font-size: 0.82rem; }
-  #screen-create-group .btn-green {
-    padding: 9px 24px;
-    font-size: 0.9rem;
-  }
-  #screen-create-group .error-text { min-height: 0; margin: 0; }
 
   /* ---------- Conversa ---------- */
   #screen-chat { background: var(--grey-dark); }
@@ -1022,7 +911,6 @@
   <!-- TELA 8: Menu de configurações -->
   <div class="screen" id="screen-settings-menu">
     <div class="settings-menu-header">CONFIGURAÇÃO</div>
-    <button class="settings-menu-item" onclick="openCreateGroupScreen()">CRIAR GRUPO</button>
     <button class="settings-menu-item" onclick="openProfileEdit()">VER PERFIL</button>
     <button class="settings-menu-item" onclick="openWelcomeMessageScreen()">MENSAGEM DE BOAS VINDAS</button>
     <button class="settings-menu-item" onclick="openScheduleScreen()">AGENDA MESAGEM</button>
@@ -1078,50 +966,6 @@
     <div class="about-box" id="about-box"></div>
   </div>
 
-  <!-- TELA 13: Criar grupo -->
-  <div class="screen" id="screen-create-group">
-    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
-    <h1>CRIAR SEU GRUPO</h1>
-    <input class="field" id="group-name-input" placeholder="crie um nome" autocomplete="off" />
-    <button class="photo-picker settings-avatar-big" id="group-avatar-btn" onclick="document.getElementById('group-avatar-input').click()">CARREGA<br/>FOTO</button>
-    <input type="file" id="group-avatar-input" accept="image/*" style="display:none" onchange="onGroupAvatarSelected(event)" />
-    <textarea class="field settings-textarea" id="group-description-input" placeholder="criar uma descrição" rows="2"></textarea>
-    <h2 class="settings-heading" style="font-size:0.95rem;">ADICIONAR PARTICIPANTES</h2>
-    <div class="group-add-member-row">
-      <input class="field" id="group-add-member-input" placeholder="nome do usuário" autocomplete="off" />
-      <button class="btn-green" style="padding:0 18px;" onclick="addGroupMemberByUsername()">Add</button>
-    </div>
-    <p class="error-text" id="group-member-error"></p>
-    <div id="group-members-list" class="group-members-list"></div>
-    <h2 class="settings-heading" style="font-size:0.95rem;">QUEM PODE ENVIAR MENSAGEM</h2>
-    <div class="permission-row">
-      <label class="permission-option">
-        <input type="radio" name="group-permission" value="adm" />
-        <span>ADM</span>
-      </label>
-      <label class="permission-option">
-        <input type="radio" name="group-permission" value="participante" checked />
-        <span>PARTICIPANTE</span>
-      </label>
-    </div>
-    <p class="error-text" id="group-error"></p>
-    <button class="btn-green" onclick="createGroup()">CRIAR GRUPO</button>
-  </div>
-
-  <!-- TELA 14: Informações do grupo -->
-  <div class="screen" id="screen-group-info">
-    <button class="back-arrow" onclick="goTo('screen-chat')">←</button>
-    <button class="photo-picker settings-avatar-big" id="group-info-avatar" style="pointer-events:none;"></button>
-    <div class="settings-username-pill" id="group-info-name"></div>
-    <div class="group-info-box">
-      <div class="group-info-label">DESCRIÇÃO DO GRUPO</div>
-      <div class="group-info-content" id="group-info-description"></div>
-    </div>
-    <div class="group-info-box">
-      <div class="group-info-label">TODOS PARTICIPANTES DO GRUPO</div>
-      <div class="group-info-content" id="group-info-members"></div>
-    </div>
-  </div>
   <!-- TELA 4: Adicionar usuário -->
   <div class="screen" id="screen-add-user">
     <button class="back-arrow" onclick="goTo('screen-main')">←</button>
@@ -1135,7 +979,7 @@
   <div class="screen" id="screen-chat">
     <div class="chat-topbar">
       <button class="back-arrow" onclick="goTo('screen-main')">←</button>
-      <div class="chat-header-pill" id="chat-header-pill" onclick="onChatHeaderClick()">
+      <div class="chat-header-pill" id="chat-header-pill">
         <div class="avatar" id="chat-avatar"></div>
         <div class="chat-header-text">
           <div class="name" id="chat-contact-name"></div>
@@ -1213,12 +1057,9 @@
     let myUsername = localStorage.getItem(STORAGE_USERNAME);
     let myAvatar = localStorage.getItem(STORAGE_AVATAR) || null;
     let contacts = JSON.parse(localStorage.getItem(STORAGE_CONTACTS) || '[]'); // [{username, avatar}]
-    let groups = []; // [{id, name, avatar, description, permission, createdBy}]
     let socket = null;
     let currentChatUser = null;
-    let currentGroupId = null;
     let pendingAvatarDataUrl = null;
-    let pendingGroupAvatarDataUrl = null;
 
     function goTo(screenId) {
       document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -1619,51 +1460,16 @@
       const query = searchEl ? normalize(searchEl.value) : '';
 
       const filteredContacts = query ? contacts.filter((c) => c.username.includes(query)) : contacts;
-      const filteredGroups = query ? groups.filter((g) => normalize(g.name).includes(query)) : groups;
 
-      if (contacts.length === 0 && groups.length === 0) {
-        list.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.<br/>Toque no + para adicionar alguém pelo nome de usuário, ou crie um grupo nas configurações.</p>';
+      if (contacts.length === 0) {
+        list.innerHTML = '<p class="empty-contacts">Você ainda não tem contatos.<br/>Toque no + para adicionar alguém pelo nome de usuário.</p>';
         return;
       }
 
-      if (filteredContacts.length === 0 && filteredGroups.length === 0) {
+      if (filteredContacts.length === 0) {
         list.innerHTML = '<p class="empty-contacts">Nenhum resultado encontrado.</p>';
         return;
       }
-
-      filteredGroups.forEach((group) => {
-        const row = document.createElement('div');
-        row.className = 'contact-row';
-
-        const avatarWrap = document.createElement('div');
-        avatarWrap.className = 'avatar-wrap';
-        const avatar = document.createElement('div');
-        avatar.className = 'avatar';
-        renderAvatarInto(avatar, group.name, group.avatar);
-        const groupDot = document.createElement('div');
-        groupDot.className = 'group-dot';
-        avatarWrap.appendChild(avatar);
-        avatarWrap.appendChild(groupDot);
-
-        const info = document.createElement('div');
-        info.className = 'contact-info';
-        info.onclick = () => openGroupChat(group.id);
-
-        const name = document.createElement('div');
-        name.className = 'contact-name';
-        name.textContent = group.name;
-
-        const status = document.createElement('div');
-        status.className = 'contact-status';
-        status.textContent = 'grupo';
-
-        info.appendChild(name);
-        info.appendChild(status);
-
-        row.appendChild(avatarWrap);
-        row.appendChild(info);
-        list.appendChild(row);
-      });
 
       filteredContacts.forEach((contact) => {
         const row = document.createElement('div');
@@ -1763,9 +1569,6 @@
     // ---------- Tela 5: conversa ----------
     async function openChat(user) {
       currentChatUser = user;
-      currentGroupId = null;
-      document.getElementById('chat-call-audio-btn').style.display = 'inline-block';
-      document.getElementById('chat-call-video-btn').style.display = 'inline-block';
       document.getElementById('chat-contact-name').textContent = user;
       document.getElementById('messages').innerHTML = '';
       goTo('screen-chat');
@@ -1802,69 +1605,6 @@
         history.forEach(appendBubble);
         scrollToBottom();
       } catch (err) { /* segue sem histórico se der erro de rede */ }
-    }
-
-    function onChatHeaderClick() {
-      if (currentGroupId) openGroupInfo(currentGroupId);
-    }
-
-    // ---------- Conversa em grupo ----------
-    let currentGroupData = null;
-
-    async function openGroupChat(groupId) {
-      currentChatUser = null;
-      currentGroupId = groupId;
-      document.getElementById('chat-call-audio-btn').style.display = 'none';
-      document.getElementById('chat-call-video-btn').style.display = 'none';
-      document.getElementById('messages').innerHTML = '';
-      goTo('screen-chat');
-
-      const cachedGroup = groups.find((g) => g.id === groupId);
-      if (cachedGroup) {
-        document.getElementById('chat-contact-name').textContent = cachedGroup.name;
-        renderAvatarInto(document.getElementById('chat-avatar'), cachedGroup.name, cachedGroup.avatar);
-      }
-      document.getElementById('chat-contact-status').textContent = 'grupo';
-      document.getElementById('chat-contact-status').className = 'status';
-
-      try {
-        const res = await fetch('/api/groups/' + groupId, { headers: { 'Authorization': 'Bearer ' + token } });
-        if (res.ok) {
-          currentGroupData = await res.json();
-          document.getElementById('chat-contact-name').textContent = currentGroupData.name;
-          renderAvatarInto(document.getElementById('chat-avatar'), currentGroupData.name, currentGroupData.avatar);
-          document.getElementById('chat-contact-status').textContent = currentGroupData.members.length + ' participantes';
-        }
-      } catch (err) { /* segue com os dados em cache */ }
-
-      try {
-        const historyRes = await fetch('/api/groups/' + groupId + '/messages', { headers: { 'Authorization': 'Bearer ' + token } });
-        const history = await historyRes.json();
-        history.forEach((msg) => appendBubble({ from_user: msg.from_user, content: msg.content, senderLabel: msg.from_user }));
-        scrollToBottom();
-      } catch (err) { /* segue sem histórico */ }
-    }
-
-    async function openGroupInfo(groupId) {
-      try {
-        const res = await fetch('/api/groups/' + groupId, { headers: { 'Authorization': 'Bearer ' + token } });
-        if (!res.ok) return;
-        const group = await res.json();
-        renderAvatarInto(document.getElementById('group-info-avatar'), group.name, group.avatar);
-        document.getElementById('group-info-name').textContent = group.name;
-        document.getElementById('group-info-description').textContent = group.description || '(sem descrição)';
-        const membersEl = document.getElementById('group-info-members');
-        membersEl.innerHTML = '';
-        group.members.forEach((m) => {
-          const line = document.createElement('div');
-          line.className = 'member-line';
-          line.textContent = m.username + (m.role === 'adm' ? ' (admin)' : '');
-          membersEl.appendChild(line);
-        });
-        goTo('screen-group-info');
-      } catch (err) {
-        alert('Não foi possível carregar as informações do grupo.');
-      }
     }
 
     let chatContactOnline = false;
@@ -1911,13 +1651,6 @@
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
 
-      if (currentGroupId && !mine) {
-        const senderLabel = document.createElement('div');
-        senderLabel.className = 'bubble-sender';
-        senderLabel.textContent = msg.from_user;
-        bubble.appendChild(senderLabel);
-      }
-
       if (typeof msg.content === 'string' && msg.content.startsWith('data:image')) {
         const img = document.createElement('img');
         img.src = msg.content;
@@ -1945,17 +1678,7 @@
     function sendMessage() {
       const input = document.getElementById('message-input');
       const content = input.value.trim();
-      if (!content || !socket) return;
-
-      if (currentGroupId) {
-        socket.emit('sendGroupMessage', { groupId: currentGroupId, content });
-        appendBubble({ from_user: myUsername, content });
-        scrollToBottom();
-        input.value = '';
-        return;
-      }
-
-      if (!currentChatUser) return;
+      if (!content || !currentChatUser || !socket) return;
       socket.emit('sendMessage', { to: currentChatUser, content });
       appendBubble({ from_user: myUsername, content });
       scrollToBottom();
@@ -2483,30 +2206,6 @@
         }
       });
 
-      socket.on('groupAdded', (group) => {
-        if (!groups.find((g) => g.id === group.id)) {
-          groups.push(group);
-          renderContacts();
-          playMessageSound();
-          showBrowserNotification(group.name, 'Você foi adicionado a esse grupo');
-        }
-      });
-
-      socket.on('groupMessage', (msg) => {
-        if (currentGroupId === msg.group_id && msg.from_user !== myUsername) {
-          appendBubble(msg);
-          scrollToBottom();
-        }
-        if (msg.from_user !== myUsername) {
-          playMessageSound();
-          const groupInfo = groups.find((g) => g.id === msg.group_id);
-          showBrowserNotification(
-            (groupInfo ? groupInfo.name : 'Grupo') + ' — ' + msg.from_user,
-            msg.content.startsWith('data:image') ? '📷 Foto' : msg.content.startsWith('data:audio') ? '🎤 Áudio' : msg.content
-          );
-        }
-      });
-
       // --- Sinalização de chamada ---
       socket.on('call:offer', ({ from, offer, callType }) => {
         if (callState !== 'idle') {
@@ -2552,167 +2251,12 @@
       });
     }
 
-    // ---------- Grupos: carregar lista e criar novo ----------
-    async function loadGroups() {
-      try {
-        const res = await fetch('/api/groups', { headers: { 'Authorization': 'Bearer ' + token } });
-        if (res.ok) {
-          groups = await res.json();
-          renderContacts();
-        }
-      } catch (err) { /* segue sem grupos se der erro de rede */ }
-    }
-
-    function openCreateGroupScreen() {
-      document.getElementById('group-name-input').value = '';
-      document.getElementById('group-description-input').value = '';
-      document.getElementById('group-error').textContent = '';
-      document.getElementById('group-member-error').textContent = '';
-      document.getElementById('group-add-member-input').value = '';
-      pendingGroupAvatarDataUrl = null;
-      const avatarBtn = document.getElementById('group-avatar-btn');
-      avatarBtn.innerHTML = 'CARREGA<br/>FOTO';
-
-      document.querySelectorAll('input[name="group-permission"]').forEach((r) => { r.checked = r.value === 'participante'; });
-
-      const membersList = document.getElementById('group-members-list');
-      membersList.innerHTML = '';
-      if (contacts.length === 0) {
-        membersList.innerHTML = '<p class="empty-contacts" style="padding:14px;">Nenhum contato salvo ainda — use o campo acima pra adicionar pelo nome de usuário.</p>';
-      } else {
-        contacts.forEach((c) => {
-          const row = document.createElement('label');
-          row.className = 'group-member-row';
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.value = c.username;
-          checkbox.className = 'group-member-checkbox';
-          const span = document.createElement('span');
-          span.textContent = c.username;
-          row.appendChild(checkbox);
-          row.appendChild(span);
-          membersList.appendChild(row);
-        });
-      }
-
-      goTo('screen-create-group');
-    }
-
-    // Adiciona qualquer usuário (mesmo que não seja um contato salvo) à lista
-    // de participantes do grupo, depois de confirmar que ele existe de verdade.
-    async function addGroupMemberByUsername() {
-      const input = document.getElementById('group-add-member-input');
-      const errorEl = document.getElementById('group-member-error');
-      errorEl.textContent = '';
-      const username = normalize(input.value);
-      if (!username) return;
-
-      if (username === myUsername) {
-        errorEl.textContent = 'Você já participa automaticamente, não precisa se adicionar.';
-        return;
-      }
-
-      const existing = document.querySelector('.group-member-checkbox[value="' + CSS.escape(username) + '"]');
-      if (existing) {
-        existing.checked = true;
-        input.value = '';
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/user/' + encodeURIComponent(username));
-        if (res.status === 404) {
-          errorEl.textContent = 'Esse usuário não existe.';
-          return;
-        }
-        const profile = await res.json();
-
-        const membersList = document.getElementById('group-members-list');
-        const emptyMsg = membersList.querySelector('.empty-contacts');
-        if (emptyMsg) emptyMsg.remove();
-
-        const row = document.createElement('label');
-        row.className = 'group-member-row';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = profile.username;
-        checkbox.className = 'group-member-checkbox';
-        checkbox.checked = true;
-        const span = document.createElement('span');
-        span.textContent = profile.username;
-        row.appendChild(checkbox);
-        row.appendChild(span);
-        membersList.appendChild(row);
-
-        input.value = '';
-      } catch (err) {
-        errorEl.textContent = 'Erro de conexão. Tente novamente.';
-      }
-    }
-
-    async function onGroupAvatarSelected(event) {
-      const file = event.target.files[0];
-      event.target.value = '';
-      if (!file) return;
-      pendingGroupAvatarDataUrl = await resizeImage(file, 300, 0.85);
-      const btn = document.getElementById('group-avatar-btn');
-      btn.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = pendingGroupAvatarDataUrl;
-      btn.appendChild(img);
-    }
-
-    async function createGroup() {
-      const errorEl = document.getElementById('group-error');
-      errorEl.textContent = '';
-      const name = document.getElementById('group-name-input').value.trim();
-      const description = document.getElementById('group-description-input').value.trim();
-      const permission = document.querySelector('input[name="group-permission"]:checked').value;
-      const members = Array.from(document.querySelectorAll('.group-member-checkbox:checked')).map((el) => el.value);
-
-      if (!name) {
-        errorEl.textContent = 'Dê um nome ao grupo.';
-        return;
-      }
-
-      if (members.length === 0) {
-        if (!confirm('Você não adicionou nenhum participante. Criar o grupo só com você por enquanto?')) return;
-      }
-
-      try {
-        const res = await fetch('/api/groups', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ name, description, avatar: pendingGroupAvatarDataUrl, permission, members }),
-        });
-        const rawText = await res.text();
-        const data = JSON.parse(rawText);
-        // --- DEBUG TEMPORÁRIO: mostra só o que interessa, sem a foto atrapalhando ---
-        alert(
-          'DEBUG\nStatus: ' + res.status +
-          '\n\nmembers (quem ficou no grupo):\n' + JSON.stringify(data.members, null, 2) +
-          '\n\ndebug (o que o servidor recebeu e achou):\n' + JSON.stringify(data.debug, null, 2)
-        );
-        // --- FIM DEBUG ---
-        if (!res.ok) {
-          errorEl.textContent = data.error || 'Não foi possível criar o grupo.';
-          return;
-        }
-        await loadGroups();
-        goTo('screen-main');
-      } catch (err) {
-        errorEl.textContent = 'Erro de conexão. Tente novamente.';
-        alert('DEBUG ERRO CAPTURADO: ' + err.message);
-      }
-    }
-
     // ---------- Inicialização ----------
     if (token && myUsername) {
       requestNotificationPermission();
       connectSocket();
       renderContacts();
       renderTopbarProfile();
-      loadGroups();
       goTo('screen-main');
     }
   </script>
