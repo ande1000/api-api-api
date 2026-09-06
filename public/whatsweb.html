@@ -414,15 +414,10 @@
     text-align: center;
     cursor: pointer;
   }
-  .settings-menu-item.logout-item {
-    background: var(--red);
-    color: var(--white);
-    margin-top: 12px;
-  }
   .settings-menu-back { position: static; align-self: flex-start; color: var(--white); margin-top: 10px; }
 
   /* ---------- Telas simples de configuração (boas-vindas, agendar, bloquear, sobre) ---------- */
-  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about {
+  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-note, #screen-pix {
     background: var(--black);
     align-items: center;
     padding: 60px 24px 24px;
@@ -430,7 +425,7 @@
     position: relative;
     overflow-y: auto;
   }
-  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1 {
+  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-note h1, #screen-pix h1 {
     color: var(--white);
     font-size: 1.3rem;
     font-weight: 800;
@@ -866,7 +861,7 @@
   <!-- TELA 3: Principal (lista de contatos) -->
   <div class="screen" id="screen-main">
     <div class="topbar">
-      <div class="topbar-left" onclick="openSettingsMenu()">
+      <div class="topbar-left" onclick="openProfileEdit()">
         <div class="avatar" id="my-avatar-topbar"></div>
         <div class="topbar-username" id="my-username-topbar"></div>
       </div>
@@ -900,13 +895,34 @@
   <!-- TELA 8: Menu de configurações -->
   <div class="screen" id="screen-settings-menu">
     <div class="settings-menu-header">CONFIGURAÇÃO</div>
-    <button class="settings-menu-item" onclick="openProfileEdit()">VER PERFIL</button>
+    <button class="settings-menu-item" onclick="openNoteScreen()">bloco de nota</button>
+    <button class="settings-menu-item" onclick="openPixScreen()">AD.chave pix</button>
     <button class="settings-menu-item" onclick="openWelcomeMessageScreen()">MENSAGEM DE BOAS VINDAS</button>
     <button class="settings-menu-item" onclick="openScheduleScreen()">AGENDA MESAGEM</button>
     <button class="settings-menu-item" onclick="openBlockUserScreen()">BLOQUEAR USUARIO</button>
     <button class="settings-menu-item" onclick="openAboutScreen()">SOBRE APP</button>
-    <button class="settings-menu-item logout-item" onclick="logout()">SAIR DA CONTA</button>
+    <button class="settings-menu-item" onclick="logout()">sair da conta</button>
     <button class="back-arrow settings-menu-back" onclick="goTo('screen-main')">←</button>
+  </div>
+
+  <!-- TELA 15: Bloco de nota -->
+  <div class="screen" id="screen-note">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>Bloco de nota</h1>
+    <p class="settings-hint">Um espaço pessoal seu, só você vê.</p>
+    <textarea class="field settings-textarea" id="note-input" placeholder="Escreva sua nota..." rows="8"></textarea>
+    <p class="error-text" id="note-error"></p>
+    <button class="btn-green" onclick="saveNote()">salvar</button>
+  </div>
+
+  <!-- TELA 16: Chave pix -->
+  <div class="screen" id="screen-pix">
+    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
+    <h1>Adicionar chave pix</h1>
+    <p class="settings-hint">Guarde sua chave pix aqui pra ter à mão quando precisar.</p>
+    <input class="field" id="pix-input" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off" />
+    <p class="error-text" id="pix-error"></p>
+    <button class="btn-green" onclick="savePix()">salvar</button>
   </div>
 
   <!-- TELA 9: Mensagem de boas-vindas -->
@@ -1239,6 +1255,68 @@
           connectSocket();
         }
         goTo('screen-main');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    // ---------- Tela 15: Bloco de nota ----------
+    async function openNoteScreen() {
+      goTo('screen-note');
+      document.getElementById('note-error').textContent = '';
+      try {
+        const res = await fetch('/api/settings', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('note-input').value = data.note || '';
+      } catch (err) { /* segue com o campo vazio se der erro */ }
+    }
+
+    async function saveNote() {
+      const errorEl = document.getElementById('note-error');
+      errorEl.textContent = '';
+      const note = document.getElementById('note-input').value;
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ note }),
+        });
+        if (!res.ok) {
+          errorEl.textContent = 'Não foi possível salvar.';
+          return;
+        }
+        goTo('screen-settings-menu');
+      } catch (err) {
+        errorEl.textContent = 'Erro de conexão. Tente novamente.';
+      }
+    }
+
+    // ---------- Tela 16: Chave pix ----------
+    async function openPixScreen() {
+      goTo('screen-pix');
+      document.getElementById('pix-error').textContent = '';
+      try {
+        const res = await fetch('/api/settings', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('pix-input').value = data.pixKey || '';
+      } catch (err) { /* segue com o campo vazio se der erro */ }
+    }
+
+    async function savePix() {
+      const errorEl = document.getElementById('pix-error');
+      errorEl.textContent = '';
+      const pixKey = document.getElementById('pix-input').value.trim();
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ pixKey }),
+        });
+        if (!res.ok) {
+          errorEl.textContent = 'Não foi possível salvar.';
+          return;
+        }
+        goTo('screen-settings-menu');
       } catch (err) {
         errorEl.textContent = 'Erro de conexão. Tente novamente.';
       }
