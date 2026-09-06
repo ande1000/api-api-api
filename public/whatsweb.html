@@ -168,61 +168,36 @@
     flex: 1.4;
     letter-spacing: 0.5px;
   }
-  .topbar-right {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-  }
-  .settings-btn {
+  .menu-dots-btn {
     background: none;
     border: none;
     cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     color: var(--white);
-    padding: 0;
-    line-height: 1.1;
-  }
-  .settings-label {
-    font-size: 0.6rem;
+    font-size: 1.6rem;
     font-weight: 800;
-    letter-spacing: 0.5px;
-  }
-  .settings-icon {
-    background: rgba(255,255,255,0.35);
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    margin-top: 2px;
-  }
-  .topbar .logout-link {
-    color: var(--white);
-    font-size: 0.9rem;
-    font-weight: 800;
-    text-decoration: underline;
-    cursor: pointer;
-    margin-top: 2px;
+    line-height: 1;
+    padding: 4px 8px;
+    flex-shrink: 0;
   }
   .search-bar-wrap { padding: 10px 14px 4px; background: var(--black); }
   .search-input {
-    width: 100%;
-    padding: 10px 16px;
-    border-radius: 20px;
+    width: 60%;
+    max-width: 220px;
+    padding: 8px 14px;
+    border-radius: 18px;
     border: none;
     background: var(--white);
     color: var(--red);
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
   .search-input::placeholder { color: var(--red); opacity: 0.75; }
+  .conversas-heading {
+    color: var(--white);
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 10px 14px 4px;
+  }
   .contact-list { flex: 1; overflow-y: auto; padding: 8px 0; }
   .contact-row {
     display: flex;
@@ -290,10 +265,21 @@
     line-height: 1.6;
     font-size: 0.95rem;
   }
-  .fab {
+  .fab-wrap {
     position: absolute;
     right: 22px;
     bottom: 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .fab-label {
+    color: var(--white);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .fab {
     width: 58px;
     height: 58px;
     border-radius: 50%;
@@ -427,6 +413,11 @@
     font-size: 0.95rem;
     text-align: center;
     cursor: pointer;
+  }
+  .settings-menu-item.logout-item {
+    background: var(--red);
+    color: var(--white);
+    margin-top: 12px;
   }
   .settings-menu-back { position: static; align-self: flex-start; color: var(--white); margin-top: 10px; }
 
@@ -880,19 +871,17 @@
         <div class="topbar-username" id="my-username-topbar"></div>
       </div>
       <h1 class="topbar-title">WHATS WEB APP</h1>
-      <div class="topbar-right">
-        <button class="settings-btn" onclick="openSettingsMenu()" title="Configuração">
-          <span class="settings-label">CONFIGURAÇÃO</span>
-          <span class="settings-icon">⚙</span>
-        </button>
-        <span class="logout-link" onclick="logout()">SAIR</span>
-      </div>
+      <button class="menu-dots-btn" onclick="openSettingsMenu()" title="Configuração">⋮</button>
     </div>
     <div class="search-bar-wrap">
       <input id="contact-search" class="search-input" placeholder="pesquisa contatos" autocomplete="off" oninput="renderContacts()" />
     </div>
+    <h2 class="conversas-heading">conversas</h2>
     <div class="contact-list" id="contact-list"></div>
-    <button class="fab" onclick="goTo('screen-add-user')">+</button>
+    <div class="fab-wrap">
+      <span class="fab-label">ad.usuario</span>
+      <button class="fab" onclick="goTo('screen-add-user')">+</button>
+    </div>
   </div>
 
   <!-- TELA 7: Editar perfil (dentro de Configurações > Ver perfil) -->
@@ -916,6 +905,7 @@
     <button class="settings-menu-item" onclick="openScheduleScreen()">AGENDA MESAGEM</button>
     <button class="settings-menu-item" onclick="openBlockUserScreen()">BLOQUEAR USUARIO</button>
     <button class="settings-menu-item" onclick="openAboutScreen()">SOBRE APP</button>
+    <button class="settings-menu-item logout-item" onclick="logout()">SAIR DA CONTA</button>
     <button class="back-arrow settings-menu-back" onclick="goTo('screen-main')">←</button>
   </div>
 
