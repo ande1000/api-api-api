@@ -453,17 +453,21 @@
   #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-note, #screen-pix {
     background: var(--black);
     align-items: center;
-    padding: 60px 24px 24px;
-    gap: 14px;
+    padding: 44px 24px 20px;
+    gap: 10px;
     position: relative;
     overflow-y: auto;
   }
   #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-note h1, #screen-pix h1 {
     color: var(--white);
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: 800;
     text-align: center;
-    margin: 0 0 4px;
+    margin: 0 0 2px;
+  }
+  #screen-schedule .empty-contacts, #screen-block-user .empty-contacts {
+    padding: 14px 10px;
+    font-size: 0.85rem;
   }
   .settings-hint { color: #999; font-size: 0.85rem; text-align: center; margin: 0 0 6px; }
   .settings-textarea {
@@ -520,12 +524,12 @@
   .schedule-form {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
     max-width: 320px;
     border-top: 1px solid #333;
-    padding-top: 16px;
-    margin-top: 6px;
+    padding-top: 12px;
+    margin-top: 2px;
   }
   .schedule-datetime-row { display: flex; gap: 10px; }
   .schedule-datetime-row .field { flex: 1; }
