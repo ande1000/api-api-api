@@ -780,6 +780,41 @@
   }
   .popup-menu button:active { background: #f2f2f2; }
 
+  /* ---------- Menu popup de anexo (foto / vídeo / documento) ---------- */
+  .attach-popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: flex-end;
+    justify-content: flex-start;
+    z-index: 50;
+    padding: 0 0 68px 12px;
+  }
+  .attach-popup-overlay.active { display: flex; }
+  .attach-popup-menu {
+    background: var(--white);
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 190px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  .attach-popup-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    color: var(--black);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .attach-popup-menu button:active { background: #f2f2f2; }
+
   /* ---------- Chamada de voz ---------- */
   #screen-call {
     background: var(--black);
@@ -1043,8 +1078,10 @@
       <button class="cancel-record-btn" onclick="cancelAudioRecording()">Cancelar</button>
     </div>
     <div class="composer">
-      <button class="photo-btn" onclick="document.getElementById('photo-input').click()">+</button>
+      <button class="photo-btn" onclick="toggleAttachMenu()">+</button>
       <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
+      <input type="file" id="video-input" accept="video/*" style="display:none" onchange="sendVideo(event)" />
+      <input type="file" id="document-input" accept="*/*" style="display:none" onchange="sendDocument(event)" />
       <input type="text" id="message-input" placeholder="diginta sua mesagem aqui" autocomplete="off" />
       <button class="emoji-btn" onclick="toggleEmojiPicker()" title="Emojis">😊</button>
       <button class="audio-btn" id="audio-btn" onclick="toggleAudioRecording()" title="Gravar áudio">🎤</button>
@@ -1055,6 +1092,15 @@
   <!-- Painel de emojis -->
   <div class="emoji-popup-overlay" id="emoji-popup-overlay" onclick="closeEmojiPickerIfOutside(event)">
     <div class="emoji-popup-grid" id="emoji-popup-grid"></div>
+  </div>
+
+  <!-- Popup do menu de anexo (+) -->
+  <div class="attach-popup-overlay" id="attach-menu-overlay" onclick="closeAttachMenuIfOutside(event)">
+    <div class="attach-popup-menu">
+      <button onclick="closeAttachMenu(); document.getElementById('photo-input').click();">📷 Foto</button>
+      <button onclick="closeAttachMenu(); document.getElementById('video-input').click();">🎥 Vídeo</button>
+      <button onclick="closeAttachMenu(); document.getElementById('document-input').click();">📄 Documento</button>
+    </div>
   </div>
 
   <!-- Popup do menu (⋮) -->
@@ -1767,6 +1813,26 @@
         audio.controls = true;
         audio.src = msg.content;
         bubble.appendChild(audio);
+      } else if (typeof msg.content === 'string' && msg.content.startsWith('data:video')) {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.src = msg.content;
+        video.style.maxWidth = '240px';
+        video.style.borderRadius = '8px';
+        video.style.display = 'block';
+        bubble.appendChild(video);
+      } else if (typeof msg.content === 'string' && msg.content.startsWith('data:') && msg.content.includes('#filename=')) {
+        const hashIndex = msg.content.indexOf('#filename=');
+        const fileDataUrl = msg.content.slice(0, hashIndex);
+        const filename = decodeURIComponent(msg.content.slice(hashIndex + '#filename='.length)) || 'arquivo';
+        const link = document.createElement('a');
+        link.href = fileDataUrl;
+        link.download = filename;
+        link.textContent = '📄 ' + filename;
+        link.style.color = 'inherit';
+        link.style.textDecoration = 'underline';
+        link.style.display = 'block';
+        bubble.appendChild(link);
       } else {
         const text = document.createElement('div');
         text.textContent = msg.content;
@@ -1916,6 +1982,59 @@
       const dataUrl = await resizeImage(file, 800, 0.7);
       socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
       appendBubble({ from_user: myUsername, content: dataUrl });
+      scrollToBottom();
+    }
+
+    // ---------- Menu de anexo (+) ----------
+    function toggleAttachMenu() {
+      document.getElementById('attach-menu-overlay').classList.toggle('active');
+    }
+    function closeAttachMenu() {
+      document.getElementById('attach-menu-overlay').classList.remove('active');
+    }
+    function closeAttachMenuIfOutside(event) {
+      if (event.target.id === 'attach-menu-overlay') closeAttachMenu();
+    }
+
+    const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB
+
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ---------- Envio de vídeo ----------
+    async function sendVideo(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file || !currentChatUser) return;
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        alert('Esse vídeo é muito grande (máx. 20MB).');
+        return;
+      }
+      const dataUrl = await readFileAsDataURL(file);
+      socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
+      appendBubble({ from_user: myUsername, content: dataUrl });
+      scrollToBottom();
+    }
+
+    // ---------- Envio de documento/arquivo ----------
+    async function sendDocument(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file || !currentChatUser) return;
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        alert('Esse arquivo é muito grande (máx. 20MB).');
+        return;
+      }
+      const dataUrl = await readFileAsDataURL(file);
+      const payload = dataUrl + '#filename=' + encodeURIComponent(file.name);
+      socket.emit('sendMessage', { to: currentChatUser, content: payload });
+      appendBubble({ from_user: myUsername, content: payload });
       scrollToBottom();
     }
 
