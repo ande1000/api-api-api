@@ -380,8 +380,6 @@ function deliverMessage(from, to, content) {
         ? '📷 Foto'
         : content.startsWith('data:audio')
         ? '🎤 Áudio'
-        : content.startsWith('data:video')
-        ? '🎥 Vídeo'
         : (content.startsWith('data:') && content.includes('#filename='))
         ? '📄 Documento'
         : content,
