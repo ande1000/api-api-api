@@ -618,6 +618,26 @@
   .bubble-sender { font-size: 0.75rem; font-weight: 800; color: var(--green); margin-bottom: 2px; }
   .bubble-row.me .bubble { background: var(--green-dark); border-bottom-right-radius: 3px; }
   .bubble img { max-width: 100%; border-radius: 8px; display: block; }
+  .bubble-image-wrap { position: relative; line-height: 0; }
+  .image-download-btn {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    color: var(--white);
+    border: none;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    text-decoration: none;
+  }
+  .image-download-btn:active { background: rgba(0,0,0,0.75); }
   .composer {
     display: flex;
     align-items: center;
@@ -1803,9 +1823,19 @@
       bubble.className = 'bubble';
 
       if (typeof msg.content === 'string' && msg.content.startsWith('data:image')) {
+        const wrap = document.createElement('div');
+        wrap.className = 'bubble-image-wrap';
         const img = document.createElement('img');
         img.src = msg.content;
-        bubble.appendChild(img);
+        wrap.appendChild(img);
+        const downloadBtn = document.createElement('a');
+        downloadBtn.className = 'image-download-btn';
+        downloadBtn.href = msg.content;
+        downloadBtn.download = 'imagem-' + Date.now() + '.jpg';
+        downloadBtn.title = 'Baixar imagem';
+        downloadBtn.textContent = '⬇';
+        wrap.appendChild(downloadBtn);
+        bubble.appendChild(wrap);
       } else if (typeof msg.content === 'string' && msg.content.startsWith('data:audio')) {
         const audio = document.createElement('audio');
         audio.controls = true;
