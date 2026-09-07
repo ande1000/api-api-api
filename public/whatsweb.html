@@ -1820,6 +1820,20 @@
         video.style.maxWidth = '240px';
         video.style.borderRadius = '8px';
         video.style.display = 'block';
+        video.onerror = () => {
+          bubble.innerHTML = '';
+          const notice = document.createElement('div');
+          notice.textContent = '🎥 Vídeo (não foi possível reproduzir neste aparelho)';
+          bubble.appendChild(notice);
+          const link = document.createElement('a');
+          link.href = msg.content;
+          link.download = 'video';
+          link.textContent = 'Baixar vídeo';
+          link.style.color = 'inherit';
+          link.style.textDecoration = 'underline';
+          link.style.display = 'block';
+          bubble.appendChild(link);
+        };
         bubble.appendChild(video);
       } else if (typeof msg.content === 'string' && msg.content.startsWith('data:') && msg.content.includes('#filename=')) {
         const hashIndex = msg.content.indexOf('#filename=');
@@ -2008,6 +2022,17 @@
     }
 
     // ---------- Envio de vídeo ----------
+    function canLikelyPlayVideo(file) {
+      // Teste feito no aparelho de quem ENVIA. Não garante que quem recebe
+      // consiga tocar (o navegador de cada um pode ter codecs diferentes),
+      // mas pega os casos mais comuns (ex: HEVC do iPhone) antes de enviar.
+      const type = file.type || '';
+      const probe = document.createElement('video');
+      const support = type ? probe.canPlayType(type) : '';
+      // '' = não sabe tocar, 'maybe'/'probably' = tem chance de tocar
+      return support !== '';
+    }
+
     async function sendVideo(event) {
       const file = event.target.files[0];
       event.target.value = '';
@@ -2015,6 +2040,15 @@
       if (file.size > MAX_ATTACHMENT_BYTES) {
         alert('Esse vídeo é muito grande (máx. 20MB).');
         return;
+      }
+      if (!canLikelyPlayVideo(file)) {
+        const seguirMesmoAssim = confirm(
+          'Esse vídeo pode não tocar direito no aparelho de quem vai receber ' +
+          '(formato/codec pouco compatível, comum em vídeos gravados no iPhone).\n\n' +
+          'Prefira gravar/exportar em MP4 (H.264).\n\n' +
+          'Quer enviar assim mesmo?'
+        );
+        if (!seguirMesmoAssim) return;
       }
       const dataUrl = await readFileAsDataURL(file);
       socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
