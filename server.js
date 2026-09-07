@@ -8,12 +8,15 @@ const webpush = require('web-push');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
+  // Vídeos e arquivos viajam como base64 dentro da mensagem, então o buffer
+  // padrão do Socket.IO (1MB) é pequeno demais. 25MB dá uma folga razoável.
+  maxHttpBufferSize: 25 * 1024 * 1024,
 });
 
 // Em produção, defina a variável de ambiente JWT_SECRET com um valor único e secreto.
@@ -373,7 +376,15 @@ function deliverMessage(from, to, content) {
     sendPushToUser(to, {
       type: 'message',
       title: from,
-      body: content.startsWith('data:image') ? '📷 Foto' : content.startsWith('data:audio') ? '🎤 Áudio' : content,
+      body: content.startsWith('data:image')
+        ? '📷 Foto'
+        : content.startsWith('data:audio')
+        ? '🎤 Áudio'
+        : content.startsWith('data:video')
+        ? '🎥 Vídeo'
+        : (content.startsWith('data:') && content.includes('#filename='))
+        ? '📄 Documento'
+        : content,
     });
   }
 
