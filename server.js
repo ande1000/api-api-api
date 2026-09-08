@@ -269,6 +269,7 @@ app.get('/api/user/:username', asyncRoute(async (req, res) => {
     avatar: user.avatar || null,
     online: onlineUsers.has(username),
     blockedByMe,
+    createdAt: user.created_at || null,
   });
 }));
 
