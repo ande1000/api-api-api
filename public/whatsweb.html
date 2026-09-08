@@ -603,8 +603,34 @@
     flex-direction: column;
     gap: 10px;
   }
-  .bubble-row { display: flex; }
+  .bubble-row { display: flex; align-items: center; }
   .bubble-row.me { justify-content: flex-end; }
+  .copy-msg-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    margin: 0 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    opacity: 0.55;
+    padding: 0;
+  }
+  .copy-msg-btn:active { opacity: 1; }
+  .copy-msg-btn::before, .copy-msg-btn::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 14px;
+    border: 1.6px solid var(--white);
+    border-radius: 2px;
+    box-sizing: border-box;
+  }
+  .copy-msg-btn::before { top: 2px; left: 2px; background: #1e1e1e; }
+  .copy-msg-btn::after { top: 8px; left: 8px; background: #1e1e1e; }
+  .copy-msg-btn.copied { opacity: 1; }
+  .copy-msg-btn.copied::before, .copy-msg-btn.copied::after { border-color: var(--green); }
   .bubble {
     max-width: 72%;
     padding: 10px 14px;
@@ -1860,7 +1886,45 @@
       }
 
       row.appendChild(bubble);
+
+      // Botão de copiar texto: só em mensagens de texto simples RECEBIDAS
+      // (não em fotos/áudios/documentos, nem nas mensagens que você mesmo mandou)
+      const isPlainText = typeof msg.content === 'string' && !msg.content.startsWith('data:');
+      if (isPlainText && !mine) {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-msg-btn';
+        copyBtn.title = 'Copiar mensagem';
+        copyBtn.onclick = () => copyMessageText(msg.content, copyBtn);
+        row.appendChild(copyBtn);
+      }
+
       messagesEl.appendChild(row);
+    }
+
+    function copyMessageText(text, btnEl) {
+      const showCopied = () => {
+        if (!btnEl) return;
+        btnEl.classList.add('copied');
+        setTimeout(() => btnEl.classList.remove('copied'), 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(showCopied).catch(() => fallbackCopyText(text, showCopied));
+      } else {
+        fallbackCopyText(text, showCopied);
+      }
+    }
+
+    function fallbackCopyText(text, cb) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch (err) { /* nada a fazer */ }
+      document.body.removeChild(ta);
+      if (cb) cb();
     }
 
     function scrollToBottom() {
