@@ -1,14 +1,14 @@
 {
   "name": "message-api",
   "version": "1.0.0",
-  "description": "API de mensagens em tempo real (sem chave de API), com Express + Socket.IO + SQLite",
+  "description": "API de mensagens em tempo real (sem chave de API), com Express + Socket.IO + Turso (libSQL)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.3.0",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.7.5",
