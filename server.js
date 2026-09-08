@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const webpush = require('web-push');
@@ -30,144 +30,119 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'J8ioJc-NL9r0sSCWplbz
 webpush.setVapidDetails('mailto:contato@whatswebapp.exemplo', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 // ---------------------------------------------------------------------------
-// Banco de dados (SQLite em arquivo)
+// Banco de dados
 // ---------------------------------------------------------------------------
+// Se as variáveis TURSO_DATABASE_URL e TURSO_AUTH_TOKEN estiverem definidas
+// (configuradas no painel do Render, por exemplo), o app usa o banco remoto
+// do Turso — que não é apagado quando o servidor reinicia ou faz redeploy.
+// Sem essas variáveis (ex: rodando no seu computador pra testar), ele cai de
+// volta num arquivo SQLite local, só pra não travar o desenvolvimento.
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'messages.db');
-const db = new Database(dbPath);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    avatar TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
+const usingTurso = !!process.env.TURSO_DATABASE_URL;
+const db = createClient({
+  url: usingTurso ? process.env.TURSO_DATABASE_URL : `file:${dbPath}`,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+console.log(usingTurso ? '[banco] Usando Turso (remoto, persistente)' : '[banco] Usando arquivo local (' + dbPath + ')');
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_user TEXT NOT NULL,
-    to_user TEXT NOT NULL,
-    content TEXT NOT NULL,
-    delivered INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS push_subscriptions (
-    username TEXT PRIMARY KEY,
-    subscription TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS user_settings (
-    username TEXT PRIMARY KEY,
-    welcome_enabled INTEGER DEFAULT 0,
-    welcome_message TEXT DEFAULT ''
-  );
-
-  CREATE TABLE IF NOT EXISTS blocked_users (
-    blocker TEXT NOT NULL,
-    blocked TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (blocker, blocked)
-  );
-
-  CREATE TABLE IF NOT EXISTS scheduled_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_user TEXT NOT NULL,
-    to_user TEXT NOT NULL,
-    content TEXT NOT NULL,
-    send_at TEXT NOT NULL,
-    sent INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// Se o banco já existia de uma versão anterior (sem a coluna avatar), adiciona agora.
-try {
-  db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`);
-} catch (err) {
-  // Coluna já existe — tudo bem, ignora.
+// ---------------------------------------------------------------------------
+// Helpers para falar com o banco (o @libsql/client é assíncrono)
+// ---------------------------------------------------------------------------
+async function dbRun(sql, args = []) {
+  const result = await db.execute({ sql, args });
+  return {
+    lastInsertRowid: result.lastInsertRowid !== undefined ? Number(result.lastInsertRowid) : null,
+    changes: result.rowsAffected,
+  };
 }
-try {
-  db.exec(`ALTER TABLE user_settings ADD COLUMN note TEXT DEFAULT ''`);
-} catch (err) { /* coluna já existe */ }
-try {
-  db.exec(`ALTER TABLE user_settings ADD COLUMN pix_key TEXT DEFAULT ''`);
-} catch (err) { /* coluna já existe */ }
+async function dbGet(sql, args = []) {
+  const result = await db.execute({ sql, args });
+  return result.rows[0];
+}
+async function dbAll(sql, args = []) {
+  const result = await db.execute({ sql, args });
+  return result.rows;
+}
 
-const insertUser = db.prepare(`INSERT INTO users (username, password_hash, avatar) VALUES (?, ?, ?)`);
-const findUser = db.prepare(`SELECT * FROM users WHERE username = ?`);
-const updateAvatar = db.prepare(`UPDATE users SET avatar = ? WHERE username = ?`);
+// Envolve uma rota assíncrona do Express, capturando erros e respondendo 500
+// em vez de deixar a promessa quebrada travar a requisição sem resposta.
+function asyncRoute(fn) {
+  return (req, res) => {
+    Promise.resolve(fn(req, res)).catch((err) => {
+      console.error('Erro na rota', req.method, req.path, err);
+      if (!res.headersSent) res.status(500).json({ error: 'Erro interno do servidor' });
+    });
+  };
+}
 
-const insertMessage = db.prepare(`
-  INSERT INTO messages (from_user, to_user, content, delivered)
-  VALUES (?, ?, ?, ?)
-`);
-const markDelivered = db.prepare(`UPDATE messages SET delivered = 1 WHERE id = ?`);
-const getHistory = db.prepare(`
-  SELECT * FROM messages
-  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-  ORDER BY created_at ASC
-`);
-const getPending = db.prepare(`
-  SELECT * FROM messages WHERE to_user = ? AND delivered = 0 ORDER BY created_at ASC
-`);
-const getConversationPartners = db.prepare(`
-  SELECT DISTINCT CASE WHEN from_user = ? THEN to_user ELSE from_user END AS other_user
-  FROM messages
-  WHERE from_user = ? OR to_user = ?
-`);
-const deleteConversation = db.prepare(`
-  DELETE FROM messages
-  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-`);
-const countMessagesBetween = db.prepare(`
-  SELECT COUNT(*) AS total FROM messages
-  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-`);
+async function initDb() {
+  await db.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      avatar TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
 
-const savePushSubscription = db.prepare(`
-  INSERT INTO push_subscriptions (username, subscription, updated_at)
-  VALUES (?, ?, datetime('now'))
-  ON CONFLICT(username) DO UPDATE SET subscription = excluded.subscription, updated_at = datetime('now')
-`);
-const getPushSubscription = db.prepare(`SELECT subscription FROM push_subscriptions WHERE username = ?`);
-const deletePushSubscription = db.prepare(`DELETE FROM push_subscriptions WHERE username = ?`);
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      content TEXT NOT NULL,
+      delivered INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
 
-// --- Configurações do usuário (mensagem de boas-vindas, bloco de nota, chave pix) ---
-const getUserSettings = db.prepare(`SELECT * FROM user_settings WHERE username = ?`);
-const upsertUserSettings = db.prepare(`
-  INSERT INTO user_settings (username, welcome_enabled, welcome_message, note, pix_key)
-  VALUES (@username, @welcome_enabled, @welcome_message, @note, @pix_key)
-  ON CONFLICT(username) DO UPDATE SET
-    welcome_enabled = excluded.welcome_enabled,
-    welcome_message = excluded.welcome_message,
-    note = excluded.note,
-    pix_key = excluded.pix_key
-`);
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      username TEXT PRIMARY KEY,
+      subscription TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
 
-// --- Bloqueio de usuários ---
-const insertBlock = db.prepare(`INSERT OR IGNORE INTO blocked_users (blocker, blocked) VALUES (?, ?)`);
-const getBlock = db.prepare(`SELECT 1 FROM blocked_users WHERE blocker = ? AND blocked = ?`);
-const listBlocked = db.prepare(`SELECT blocked FROM blocked_users WHERE blocker = ? ORDER BY created_at DESC`);
+    CREATE TABLE IF NOT EXISTS user_settings (
+      username TEXT PRIMARY KEY,
+      welcome_enabled INTEGER DEFAULT 0,
+      welcome_message TEXT DEFAULT ''
+    );
 
-// --- Mensagens agendadas ---
-const insertScheduled = db.prepare(`
-  INSERT INTO scheduled_messages (from_user, to_user, content, send_at) VALUES (?, ?, ?, ?)
-`);
-const listScheduled = db.prepare(`
-  SELECT * FROM scheduled_messages WHERE from_user = ? AND sent = 0 ORDER BY send_at ASC
-`);
-const deleteScheduled = db.prepare(`DELETE FROM scheduled_messages WHERE id = ? AND from_user = ?`);
-const getDueScheduled = db.prepare(`
-  SELECT * FROM scheduled_messages WHERE sent = 0 AND send_at <= ?
-`);
-const markScheduledSent = db.prepare(`UPDATE scheduled_messages SET sent = 1 WHERE id = ?`);
+    CREATE TABLE IF NOT EXISTS blocked_users (
+      blocker TEXT NOT NULL,
+      blocked TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (blocker, blocked)
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      content TEXT NOT NULL,
+      send_at TEXT NOT NULL,
+      sent INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Se o banco já existia de uma versão anterior (sem essas colunas), adiciona agora.
+  const alters = [
+    `ALTER TABLE users ADD COLUMN avatar TEXT`,
+    `ALTER TABLE user_settings ADD COLUMN note TEXT DEFAULT ''`,
+    `ALTER TABLE user_settings ADD COLUMN pix_key TEXT DEFAULT ''`,
+  ];
+  for (const sql of alters) {
+    try {
+      await db.execute(sql);
+    } catch (err) {
+      // Coluna já existe — tudo bem, ignora.
+    }
+  }
+}
 
 // Envia uma notificação push para um usuário, se ele tiver se inscrito.
 // Isso funciona mesmo com o app fechado ou a tela do celular apagada.
 async function sendPushToUser(username, payload) {
-  const row = getPushSubscription.get(username);
+  const row = await dbGet('SELECT subscription FROM push_subscriptions WHERE username = ?', [username]);
   if (!row) return;
   try {
     const subscription = JSON.parse(row.subscription);
@@ -175,7 +150,7 @@ async function sendPushToUser(username, payload) {
   } catch (err) {
     // Inscrição expirada ou inválida — remove para não tentar de novo à toa.
     if (err.statusCode === 404 || err.statusCode === 410) {
-      deletePushSubscription.run(username);
+      await dbRun('DELETE FROM push_subscriptions WHERE username = ?', [username]);
     } else {
       console.error('Erro ao enviar push para', username, err.message);
     }
@@ -210,7 +185,7 @@ function requireAuth(req, res, next) {
 }
 
 // Cadastro: POST /api/register  { username, password }
-app.post('/api/register', (req, res) => {
+app.post('/api/register', asyncRoute(async (req, res) => {
   const username = normalizeUsername(req.body.username);
   const { password } = req.body;
 
@@ -220,53 +195,63 @@ app.post('/api/register', (req, res) => {
   if (password.length < 4) {
     return res.status(400).json({ error: 'A senha precisa ter pelo menos 4 caracteres' });
   }
-  if (findUser.get(username)) {
+  if (await dbGet('SELECT * FROM users WHERE username = ?', [username])) {
     return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
   }
 
   const passwordHash = bcrypt.hashSync(password, 10);
-  insertUser.run(username, passwordHash);
+  try {
+    await dbRun('INSERT INTO users (username, password_hash, avatar) VALUES (?, ?, ?)', [username, passwordHash, null]);
+  } catch (err) {
+    // Corrida rara: outro pedido criou o mesmo usuário entre o SELECT e o INSERT acima.
+    return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
+  }
 
   const token = createToken(username);
   res.status(201).json({ token, username });
-});
+}));
 
 // Cria um usuário simples, só com nome (sem senha) — usado pelo app "whats web app".
 // Como não há senha, o app.get('/api/login') não deve ser usado com essas contas
 // (não há como logar de novo num outro aparelho digitando a senha).
-app.post('/api/claim', (req, res) => {
+app.post('/api/claim', asyncRoute(async (req, res) => {
   const username = normalizeUsername(req.body.username);
   const avatar = typeof req.body.avatar === 'string' ? req.body.avatar : null;
   if (!username) {
     return res.status(400).json({ error: 'Informe um nome de usuário' });
   }
-  if (findUser.get(username)) {
+  if (await dbGet('SELECT * FROM users WHERE username = ?', [username])) {
     return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
   }
 
   // Senha aleatória interna só para satisfazer o banco — o usuário nunca a vê nem a usa.
   const randomPassword = Math.random().toString(36).slice(2) + Date.now();
   const passwordHash = bcrypt.hashSync(randomPassword, 10);
-  insertUser.run(username, passwordHash, avatar);
+  try {
+    await dbRun('INSERT INTO users (username, password_hash, avatar) VALUES (?, ?, ?)', [username, passwordHash, avatar]);
+  } catch (err) {
+    // Corrida rara: outro pedido criou o mesmo usuário entre o SELECT e o INSERT acima.
+    return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
+  }
 
   const token = createToken(username);
   res.status(201).json({ token, username, avatar });
-});
+}));
 
 // Verifica se um nome de usuário já existe no servidor — usado para validar
 // contatos antes de salvar (evita adicionar alguém que nunca criou conta).
-app.get('/api/exists/:username', (req, res) => {
+app.get('/api/exists/:username', asyncRoute(async (req, res) => {
   const username = normalizeUsername(req.params.username);
-  const user = findUser.get(username);
+  const user = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
   res.json({ exists: !!user });
-});
+}));
 
 // Devolve os dados públicos de um usuário: nome, foto de perfil e se está online agora.
 // Usado para mostrar a foto/status na lista de contatos e no topo da conversa.
 // Se vier um token junto (opcional), também informa se VOCÊ bloqueou essa pessoa.
-app.get('/api/user/:username', (req, res) => {
+app.get('/api/user/:username', asyncRoute(async (req, res) => {
   const username = normalizeUsername(req.params.username);
-  const user = findUser.get(username);
+  const user = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
   let blockedByMe = false;
@@ -275,7 +260,7 @@ app.get('/api/user/:username', (req, res) => {
   if (token) {
     try {
       const payload = jwt.verify(token, JWT_SECRET);
-      blockedByMe = !!getBlock.get(payload.username, username);
+      blockedByMe = !!(await dbGet('SELECT 1 FROM blocked_users WHERE blocker = ? AND blocked = ?', [payload.username, username]));
     } catch (err) { /* token inválido, apenas ignora o campo blockedByMe */ }
   }
 
@@ -285,12 +270,12 @@ app.get('/api/user/:username', (req, res) => {
     online: onlineUsers.has(username),
     blockedByMe,
   });
-});
+}));
 
 // Edita o próprio perfil (foto e/ou nome de usuário). Exige estar logado.
 // Se o nome de usuário mudar, um novo token é devolvido (o antigo passa a
 // não corresponder a ninguém, já que o nome dele não existe mais).
-app.post('/api/profile', requireAuth, (req, res) => {
+app.post('/api/profile', requireAuth, asyncRoute(async (req, res) => {
   const currentUsername = req.username;
   let finalUsername = currentUsername;
 
@@ -300,13 +285,13 @@ app.post('/api/profile', requireAuth, (req, res) => {
       return res.status(400).json({ error: 'Nome de usuário inválido' });
     }
     if (newUsername !== currentUsername) {
-      if (findUser.get(newUsername)) {
+      if (await dbGet('SELECT * FROM users WHERE username = ?', [newUsername])) {
         return res.status(409).json({ error: 'Esse nome de usuário já está em uso' });
       }
-      db.prepare(`UPDATE users SET username = ? WHERE username = ?`).run(newUsername, currentUsername);
-      db.prepare(`UPDATE messages SET from_user = ? WHERE from_user = ?`).run(newUsername, currentUsername);
-      db.prepare(`UPDATE messages SET to_user = ? WHERE to_user = ?`).run(newUsername, currentUsername);
-      db.prepare(`UPDATE push_subscriptions SET username = ? WHERE username = ?`).run(newUsername, currentUsername);
+      await dbRun('UPDATE users SET username = ? WHERE username = ?', [newUsername, currentUsername]);
+      await dbRun('UPDATE messages SET from_user = ? WHERE from_user = ?', [newUsername, currentUsername]);
+      await dbRun('UPDATE messages SET to_user = ? WHERE to_user = ?', [newUsername, currentUsername]);
+      await dbRun('UPDATE push_subscriptions SET username = ? WHERE username = ?', [newUsername, currentUsername]);
       finalUsername = newUsername;
 
       // Se essa pessoa estiver com o app aberto agora, atualiza o registro de quem está online
@@ -319,47 +304,54 @@ app.post('/api/profile', requireAuth, (req, res) => {
   }
 
   if (typeof req.body.avatar === 'string') {
-    updateAvatar.run(req.body.avatar, finalUsername);
+    await dbRun('UPDATE users SET avatar = ? WHERE username = ?', [req.body.avatar, finalUsername]);
   }
 
-  const updatedUser = findUser.get(finalUsername);
+  const updatedUser = await dbGet('SELECT * FROM users WHERE username = ?', [finalUsername]);
   const token = createToken(finalUsername);
   res.json({ token, username: finalUsername, avatar: updatedUser ? updatedUser.avatar : null });
-});
+}));
 
 // Login: POST /api/login  { username, password }
-app.post('/api/login', (req, res) => {
+app.post('/api/login', asyncRoute(async (req, res) => {
   const username = normalizeUsername(req.body.username);
   const { password } = req.body;
 
-  const user = findUser.get(username);
+  const user = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Usuário ou senha incorretos' });
   }
 
   const token = createToken(username);
   res.json({ token, username });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Usuários conectados agora (nome de usuário -> socket.id)
 // ---------------------------------------------------------------------------
 const onlineUsers = new Map();
 
-function deliverMessage(from, to, content) {
+async function deliverMessage(from, to, content) {
   // Se o destinatário bloqueou quem está enviando, a mensagem nem chega a ser salva.
-  if (getBlock.get(to, from)) {
+  if (await dbGet('SELECT 1 FROM blocked_users WHERE blocker = ? AND blocked = ?', [to, from])) {
     return null;
   }
 
   // Antes de inserir, verifica se essa é a primeira mensagem entre os dois
   // (para decidir se deve disparar a mensagem de boas-vindas do destinatário).
-  const isFirstMessage = countMessagesBetween.get(from, to, to, from).total === 0;
+  const countRow = await dbGet(
+    `SELECT COUNT(*) AS total FROM messages WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)`,
+    [from, to, to, from]
+  );
+  const isFirstMessage = Number(countRow.total) === 0;
 
   const targetSocketId = onlineUsers.get(to);
   const delivered = !!targetSocketId;
 
-  const result = insertMessage.run(from, to, content, delivered ? 1 : 0);
+  const result = await dbRun(
+    'INSERT INTO messages (from_user, to_user, content, delivered) VALUES (?, ?, ?, ?)',
+    [from, to, content, delivered ? 1 : 0]
+  );
   const message = {
     id: result.lastInsertRowid,
     from_user: from,
@@ -383,14 +375,14 @@ function deliverMessage(from, to, content) {
         : (content.startsWith('data:') && content.includes('#filename='))
         ? '📄 Documento'
         : content,
-    });
+    }).catch((err) => console.error('Erro ao enviar push:', err));
   }
 
   // Mensagem de boas-vindas automática (só na primeira mensagem que a pessoa recebe de alguém)
   if (isFirstMessage) {
-    const settings = getUserSettings.get(to);
+    const settings = await dbGet('SELECT * FROM user_settings WHERE username = ?', [to]);
     if (settings && settings.welcome_enabled && settings.welcome_message) {
-      deliverMessage(to, from, settings.welcome_message);
+      await deliverMessage(to, from, settings.welcome_message);
     }
   }
 
@@ -420,17 +412,23 @@ io.on('connection', (socket) => {
   io.emit('presence', { username, online: true });
 
   // Entrega mensagens que chegaram enquanto o usuário estava offline
-  const pending = getPending.all(username);
-  pending.forEach((msg) => {
-    socket.emit('message', msg);
-    markDelivered.run(msg.id);
-  });
+  (async () => {
+    try {
+      const pending = await dbAll('SELECT * FROM messages WHERE to_user = ? AND delivered = 0 ORDER BY created_at ASC', [username]);
+      for (const msg of pending) {
+        socket.emit('message', msg);
+        await dbRun('UPDATE messages SET delivered = 1 WHERE id = ?', [msg.id]);
+      }
+    } catch (err) {
+      console.error('Erro ao entregar mensagens pendentes:', err);
+    }
+  })();
 
   // Envio de mensagem pelo WebSocket
   socket.on('sendMessage', ({ to, content }) => {
     const toNormalized = normalizeUsername(to);
     if (!toNormalized || !content) return;
-    deliverMessage(username, toNormalized, content);
+    deliverMessage(username, toNormalized, content).catch((err) => console.error('Erro ao entregar mensagem:', err));
   });
 
   socket.on('disconnect', () => {
@@ -461,7 +459,7 @@ io.on('connection', (socket) => {
         type: 'call',
         title: username,
         body: callType === 'video' ? 'Chamada de vídeo recebida' : 'Chamada de voz recebida',
-      });
+      }).catch((err) => console.error('Erro ao enviar push:', err));
     }
   });
   socket.on('call:answer', ({ to, answer }) => relayToUser('call:answer', to, { answer }));
@@ -482,38 +480,48 @@ io.on('connection', (socket) => {
 
 // Envia uma mensagem: POST /messages  { to, content }
 // O remetente (from) vem do token, não do que o cliente mandar — evita falsificação.
-app.post('/messages', requireAuth, (req, res) => {
+app.post('/messages', requireAuth, asyncRoute(async (req, res) => {
   const to = normalizeUsername(req.body.to);
   const { content } = req.body;
   if (!to || !content) {
     return res.status(400).json({ error: 'Campos obrigatórios: to, content' });
   }
-  const message = deliverMessage(req.username, to, content);
+  const message = await deliverMessage(req.username, to, content);
   if (!message) {
     return res.status(403).json({ error: 'Não foi possível entregar a mensagem' });
   }
   res.status(201).json(message);
-});
+}));
 
 // Histórico de conversa com outro usuário: GET /messages/:otherUser
-app.get('/messages/:otherUser', requireAuth, (req, res) => {
+app.get('/messages/:otherUser', requireAuth, asyncRoute(async (req, res) => {
   const otherUser = normalizeUsername(req.params.otherUser);
-  const history = getHistory.all(req.username, otherUser, otherUser, req.username);
+  const history = await dbAll(
+    `SELECT * FROM messages WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?) ORDER BY created_at ASC`,
+    [req.username, otherUser, otherUser, req.username]
+  );
   res.json(history);
-});
+}));
 
 // Apaga o histórico de conversa com um contato (para os dois lados)
-app.delete('/messages/:otherUser', requireAuth, (req, res) => {
+app.delete('/messages/:otherUser', requireAuth, asyncRoute(async (req, res) => {
   const otherUser = normalizeUsername(req.params.otherUser);
-  deleteConversation.run(req.username, otherUser, otherUser, req.username);
+  await dbRun(
+    `DELETE FROM messages WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)`,
+    [req.username, otherUser, otherUser, req.username]
+  );
   res.json({ ok: true });
-});
+}));
 
 // Lista de conversas do usuário logado: GET /conversations
-app.get('/conversations', requireAuth, (req, res) => {
-  const partners = getConversationPartners.all(req.username, req.username, req.username);
+app.get('/conversations', requireAuth, asyncRoute(async (req, res) => {
+  const partners = await dbAll(
+    `SELECT DISTINCT CASE WHEN from_user = ? THEN to_user ELSE from_user END AS other_user
+     FROM messages WHERE from_user = ? OR to_user = ?`,
+    [req.username, req.username, req.username]
+  );
   res.json(partners.map((p) => p.other_user));
-});
+}));
 
 // Lista quem está online agora: GET /online
 app.get('/online', (req, res) => {
@@ -526,18 +534,22 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 });
 
 // Salva a inscrição push do usuário logado (chamado pelo navegador dele)
-app.post('/api/push/subscribe', requireAuth, (req, res) => {
+app.post('/api/push/subscribe', requireAuth, asyncRoute(async (req, res) => {
   const { subscription } = req.body;
   if (!subscription) return res.status(400).json({ error: 'Inscrição não enviada' });
-  savePushSubscription.run(req.username, JSON.stringify(subscription));
+  await dbRun(
+    `INSERT INTO push_subscriptions (username, subscription, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(username) DO UPDATE SET subscription = excluded.subscription, updated_at = datetime('now')`,
+    [req.username, JSON.stringify(subscription)]
+  );
   res.json({ ok: true });
-});
+}));
 
 // Remove a inscrição push do usuário logado (ex: ao sair da conta)
-app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
-  deletePushSubscription.run(req.username);
+app.post('/api/push/unsubscribe', requireAuth, asyncRoute(async (req, res) => {
+  await dbRun('DELETE FROM push_subscriptions WHERE username = ?', [req.username]);
   res.json({ ok: true });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Bloqueio de usuários
@@ -545,61 +557,70 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
 
 // Bloqueia um usuário permanentemente (você não pode mais adicioná-lo, e
 // mensagens que ele mandar pra você deixam de ser entregues).
-app.post('/api/block', requireAuth, (req, res) => {
+app.post('/api/block', requireAuth, asyncRoute(async (req, res) => {
   const target = normalizeUsername(req.body.username);
   if (!target) return res.status(400).json({ error: 'Informe um nome de usuário' });
   if (target === req.username) return res.status(400).json({ error: 'Você não pode bloquear a si mesmo' });
-  insertBlock.run(req.username, target);
+  await dbRun('INSERT OR IGNORE INTO blocked_users (blocker, blocked) VALUES (?, ?)', [req.username, target]);
   res.json({ ok: true });
-});
+}));
 
 // Lista quem você já bloqueou
-app.get('/api/blocked', requireAuth, (req, res) => {
-  res.json(listBlocked.all(req.username).map((r) => r.blocked));
-});
+app.get('/api/blocked', requireAuth, asyncRoute(async (req, res) => {
+  const rows = await dbAll('SELECT blocked FROM blocked_users WHERE blocker = ? ORDER BY created_at DESC', [req.username]);
+  res.json(rows.map((r) => r.blocked));
+}));
 
 // ---------------------------------------------------------------------------
 // Configurações do usuário: boas-vindas, bloco de nota, chave pix
 // ---------------------------------------------------------------------------
 
-app.get('/api/settings', requireAuth, (req, res) => {
-  const settings = getUserSettings.get(req.username);
+app.get('/api/settings', requireAuth, asyncRoute(async (req, res) => {
+  const settings = await dbGet('SELECT * FROM user_settings WHERE username = ?', [req.username]);
   res.json({
     welcomeEnabled: settings ? !!settings.welcome_enabled : false,
     welcomeMessage: settings ? settings.welcome_message : '',
     note: settings ? settings.note || '' : '',
     pixKey: settings ? settings.pix_key || '' : '',
   });
-});
+}));
 
 // Salva só o(s) campo(s) enviado(s), mantendo os outros como estavam —
 // assim cada tela (boas-vindas, bloco de nota, chave pix) pode salvar sem
 // apagar o que as outras telas já tinham guardado.
-app.post('/api/settings', requireAuth, (req, res) => {
-  const current = getUserSettings.get(req.username) || {
+app.post('/api/settings', requireAuth, asyncRoute(async (req, res) => {
+  const current = (await dbGet('SELECT * FROM user_settings WHERE username = ?', [req.username])) || {
     welcome_enabled: 0,
     welcome_message: '',
     note: '',
     pix_key: '',
   };
 
-  upsertUserSettings.run({
-    username: req.username,
-    welcome_enabled: req.body.welcomeEnabled !== undefined ? (req.body.welcomeEnabled ? 1 : 0) : current.welcome_enabled,
-    welcome_message: req.body.welcomeMessage !== undefined ? req.body.welcomeMessage : current.welcome_message,
-    note: req.body.note !== undefined ? req.body.note : (current.note || ''),
-    pix_key: req.body.pixKey !== undefined ? req.body.pixKey : (current.pix_key || ''),
-  });
+  const welcomeEnabled = req.body.welcomeEnabled !== undefined ? (req.body.welcomeEnabled ? 1 : 0) : current.welcome_enabled;
+  const welcomeMessage = req.body.welcomeMessage !== undefined ? req.body.welcomeMessage : current.welcome_message;
+  const note = req.body.note !== undefined ? req.body.note : (current.note || '');
+  const pixKey = req.body.pixKey !== undefined ? req.body.pixKey : (current.pix_key || '');
+
+  await dbRun(
+    `INSERT INTO user_settings (username, welcome_enabled, welcome_message, note, pix_key)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(username) DO UPDATE SET
+       welcome_enabled = excluded.welcome_enabled,
+       welcome_message = excluded.welcome_message,
+       note = excluded.note,
+       pix_key = excluded.pix_key`,
+    [req.username, welcomeEnabled, welcomeMessage, note, pixKey]
+  );
 
   res.json({ ok: true });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Agendamento de mensagens
 // ---------------------------------------------------------------------------
 
 // Cria uma mensagem agendada. sendAt deve vir no formato ISO (ex: "2026-09-10T14:30")
-app.post('/api/scheduled-messages', requireAuth, (req, res) => {
+app.post('/api/scheduled-messages', requireAuth, asyncRoute(async (req, res) => {
   const to = normalizeUsername(req.body.to);
   const { content, sendAt } = req.body;
   if (!to || !content || !sendAt) {
@@ -609,28 +630,36 @@ app.post('/api/scheduled-messages', requireAuth, (req, res) => {
   if (isNaN(sendDate.getTime())) {
     return res.status(400).json({ error: 'Data/hora inválida' });
   }
-  const result = insertScheduled.run(req.username, to, content, sendDate.toISOString());
+  const result = await dbRun(
+    'INSERT INTO scheduled_messages (from_user, to_user, content, send_at) VALUES (?, ?, ?, ?)',
+    [req.username, to, content, sendDate.toISOString()]
+  );
   res.status(201).json({ id: result.lastInsertRowid });
-});
+}));
 
 // Lista suas mensagens agendadas que ainda não foram enviadas
-app.get('/api/scheduled-messages', requireAuth, (req, res) => {
-  res.json(listScheduled.all(req.username));
-});
+app.get('/api/scheduled-messages', requireAuth, asyncRoute(async (req, res) => {
+  const rows = await dbAll('SELECT * FROM scheduled_messages WHERE from_user = ? AND sent = 0 ORDER BY send_at ASC', [req.username]);
+  res.json(rows);
+}));
 
 // Cancela uma mensagem agendada
-app.delete('/api/scheduled-messages/:id', requireAuth, (req, res) => {
-  deleteScheduled.run(req.params.id, req.username);
+app.delete('/api/scheduled-messages/:id', requireAuth, asyncRoute(async (req, res) => {
+  await dbRun('DELETE FROM scheduled_messages WHERE id = ? AND from_user = ?', [req.params.id, req.username]);
   res.json({ ok: true });
-});
+}));
 
 // A cada 30 segundos, verifica se alguma mensagem agendada já venceu e envia
-setInterval(() => {
-  const due = getDueScheduled.all(new Date().toISOString());
-  due.forEach((msg) => {
-    deliverMessage(msg.from_user, msg.to_user, msg.content);
-    markScheduledSent.run(msg.id);
-  });
+setInterval(async () => {
+  try {
+    const due = await dbAll('SELECT * FROM scheduled_messages WHERE sent = 0 AND send_at <= ?', [new Date().toISOString()]);
+    for (const msg of due) {
+      await deliverMessage(msg.from_user, msg.to_user, msg.content);
+      await dbRun('UPDATE scheduled_messages SET sent = 1 WHERE id = ?', [msg.id]);
+    }
+  } catch (err) {
+    console.error('Erro ao processar mensagens agendadas:', err);
+  }
 }, 30 * 1000);
 
 // ---------------------------------------------------------------------------
@@ -651,6 +680,14 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`API de mensagens rodando em http://localhost:${PORT}`);
-});
+
+initDb()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`API de mensagens rodando em http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Erro ao preparar o banco de dados:', err);
+    process.exit(1);
+  });
