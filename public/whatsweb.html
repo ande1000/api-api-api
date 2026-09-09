@@ -673,6 +673,17 @@
     color: var(--white);
   }
   .bubble audio { display: block; margin-top: 2px; max-width: 220px; }
+  .msg-status {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 3px;
+    height: 12px;
+  }
+  .msg-status svg { display: block; }
+  .msg-status.status-sent { color: rgba(255,255,255,0.55); }
+  .msg-status.status-delivered { color: var(--red); }
+  .msg-status.status-read { color: var(--green); }
   .bubble-row.them .bubble { background: var(--grey-bubble); border-bottom-left-radius: 3px; }
   .bubble-sender { font-size: 0.75rem; font-weight: 800; color: var(--green); margin-bottom: 2px; }
   .bubble-row.me .bubble { background: var(--green-dark); border-bottom-right-radius: 3px; }
@@ -1873,6 +1884,10 @@
         history.forEach(appendBubble);
         scrollToBottom();
       } catch (err) { /* segue sem histórico se der erro de rede */ }
+
+      // Avisa o servidor que você acabou de ver essa conversa, pra marcar
+      // como lida e a outra pessoa ver os pontinhos ficarem verdes.
+      if (socket) socket.emit('markRead', { from: user });
     }
 
     let chatContactOnline = false;
@@ -1969,7 +1984,50 @@
         row.appendChild(copyBtn);
       }
 
+      // Pontinhos de status (só nas mensagens que EU mandei):
+      // 1 pontinho = enviado, mas a pessoa ainda está sem internet (não entregue)
+      // 2 pontinhos vermelhos = entregue, mas ainda não visualizado
+      // 2 pontinhos verdes = a pessoa já visualizou a mensagem
+      if (mine) {
+        if (msg.id !== undefined && msg.id !== null) row.dataset.msgId = String(msg.id);
+        if (msg.clientId) row.dataset.clientId = msg.clientId;
+        const initialStatus = msg.read ? 'read' : (msg.delivered ? 'delivered' : 'sent');
+        bubble.appendChild(buildStatusTicks(initialStatus));
+      }
+
       messagesEl.appendChild(row);
+    }
+
+    function buildStatusTicks(status) {
+      const el = document.createElement('span');
+      el.className = 'msg-status status-' + status;
+      el.innerHTML = statusTicksSvg(status);
+      return el;
+    }
+
+    function statusTicksSvg(status) {
+      if (status === 'sent') {
+        return '<svg viewBox="0 0 14 12" width="12" height="10"><path d="M1 6.3l3 3 8-9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+      return '<svg viewBox="0 0 20 12" width="16" height="10"><path d="M1 6.3l3 3 5-7" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6.3l3 3 9-10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+
+    function setBubbleStatus(row, status) {
+      const el = row.querySelector('.msg-status');
+      if (!el) return;
+      // Nunca "regride" o status (ex: não deixa um 'lida' voltar pra 'entregue')
+      const order = { sent: 0, delivered: 1, read: 2 };
+      const current = Array.from(el.classList).find((c) => c.startsWith('status-'));
+      const currentStatus = current ? current.replace('status-', '') : 'sent';
+      if (order[status] < order[currentStatus]) return;
+      el.className = 'msg-status status-' + status;
+      el.innerHTML = statusTicksSvg(status);
+    }
+
+    // Gera um id temporário só pra conseguir identificar a bolha otimista
+    // (a que aparece na hora, antes do servidor confirmar) quando a confirmação chegar.
+    function genClientId() {
+      return 'c' + Date.now() + Math.random().toString(36).slice(2, 8);
     }
 
     function copyMessageText(text, btnEl) {
@@ -2007,8 +2065,9 @@
       const input = document.getElementById('message-input');
       const content = input.value.trim();
       if (!content || !currentChatUser || !socket) return;
-      socket.emit('sendMessage', { to: currentChatUser, content });
-      appendBubble({ from_user: myUsername, content });
+      const clientId = genClientId();
+      socket.emit('sendMessage', { to: currentChatUser, content, clientId });
+      appendBubble({ from_user: myUsername, content, clientId });
       scrollToBottom();
       input.value = '';
       stopTypingSignal();
@@ -2099,9 +2158,10 @@
 
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         const dataUrl = await blobToDataUrl(blob);
-        socket.emit('sendMessage', { to: recordingTarget, content: dataUrl });
+        const clientId = genClientId();
+        socket.emit('sendMessage', { to: recordingTarget, content: dataUrl, clientId });
         if (currentChatUser === recordingTarget) {
-          appendBubble({ from_user: myUsername, content: dataUrl });
+          appendBubble({ from_user: myUsername, content: dataUrl, clientId });
           scrollToBottom();
         }
       };
@@ -2135,8 +2195,9 @@
       event.target.value = '';
       if (!file || !currentChatUser) return;
       const dataUrl = await resizeImage(file, 800, 0.7);
-      socket.emit('sendMessage', { to: currentChatUser, content: dataUrl });
-      appendBubble({ from_user: myUsername, content: dataUrl });
+      const clientId = genClientId();
+      socket.emit('sendMessage', { to: currentChatUser, content: dataUrl, clientId });
+      appendBubble({ from_user: myUsername, content: dataUrl, clientId });
       scrollToBottom();
     }
 
@@ -2173,8 +2234,9 @@
       }
       const dataUrl = await readFileAsDataURL(file);
       const payload = dataUrl + '#filename=' + encodeURIComponent(file.name);
-      socket.emit('sendMessage', { to: currentChatUser, content: payload });
-      appendBubble({ from_user: myUsername, content: payload });
+      const clientId = genClientId();
+      socket.emit('sendMessage', { to: currentChatUser, content: payload, clientId });
+      appendBubble({ from_user: myUsername, content: payload, clientId });
       scrollToBottom();
     }
 
@@ -2556,6 +2618,8 @@
         if (currentChatUser === otherUser) {
           appendBubble(msg);
           scrollToBottom();
+          // A conversa já está aberta na tela, então a mensagem já conta como vista agora.
+          if (msg.from_user !== myUsername) socket.emit('markRead', { from: otherUser });
         } else if (msg.from_user !== myUsername) {
           // Conversa não está aberta agora — soma no contador de não lidas
           const contactEntry = findContact(otherUser);
@@ -2570,6 +2634,30 @@
             msg.content.startsWith('data:image') ? '📷 Foto' : msg.content.startsWith('data:audio') ? '🎤 Áudio' : msg.content
           );
         }
+      });
+
+      // Confirmação do servidor de que a mensagem que EU mandei foi salva —
+      // atualiza a bolha otimista (que já estava na tela) com o id real e
+      // o status certo (1 pontinho se a pessoa está offline, 2 se está online).
+      socket.on('messageSent', (msg) => {
+        if (!msg.clientId) return;
+        const row = document.querySelector('.bubble-row[data-client-id="' + msg.clientId + '"]');
+        if (!row) return;
+        if (msg.id !== undefined && msg.id !== null) row.dataset.msgId = String(msg.id);
+        setBubbleStatus(row, msg.delivered ? 'delivered' : 'sent');
+      });
+
+      // A pessoa que estava offline quando você mandou a mensagem acabou de
+      // conectar e recebeu ela agora — os pontinhos passam de 1 pra 2 (vermelho).
+      socket.on('messageDelivered', ({ id }) => {
+        const row = document.querySelector('.bubble-row.me[data-msg-id="' + id + '"]');
+        if (row) setBubbleStatus(row, 'delivered');
+      });
+
+      // A outra pessoa abriu a conversa e viu suas mensagens — pontinhos ficam verdes.
+      socket.on('messagesRead', ({ by }) => {
+        if (currentChatUser !== by) return;
+        document.querySelectorAll('#messages .bubble-row.me').forEach((row) => setBubbleStatus(row, 'read'));
       });
 
       // --- Sinalização de chamada ---
