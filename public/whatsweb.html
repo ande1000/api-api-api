@@ -344,49 +344,6 @@
     position: relative;
     overflow-y: auto;
   }
-  .settings-username-pill {
-    background: var(--white);
-    color: var(--red);
-    font-weight: 800;
-    font-size: 0.95rem;
-    border-radius: 16px;
-    padding: 8px 22px;
-    text-align: center;
-    max-width: 90%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .settings-avatar-big {
-    width: 110px;
-    height: 110px;
-    color: var(--red);
-    font-size: 0.85rem;
-    margin-top: 6px;
-  }
-  .settings-heading {
-    color: var(--white);
-    font-size: 1.2rem;
-    font-weight: 800;
-    margin: 8px 0 4px;
-  }
-  .settings-option-btn {
-    width: 100%;
-    max-width: 320px;
-    background: var(--white);
-    color: #333;
-    border: none;
-    border-radius: 8px;
-    padding: 13px 16px;
-    font-size: 0.95rem;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: left;
-  }
-  input.settings-option-btn {
-    font-weight: 400;
-    color: var(--black);
-  }
 
   /* ---------- Menu de configurações ---------- */
   #screen-settings-menu {
@@ -483,7 +440,6 @@
     justify-content: center;
     border: none;
     padding: 0;
-    cursor: pointer;
   }
   .profile-view-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .profile-view-pill {
@@ -499,9 +455,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     border: none;
-    cursor: pointer;
   }
-  .profile-view-pill.date-pill { font-size: 0.8rem; font-weight: 700; cursor: default; }
+  .profile-view-pill.date-pill { font-size: 0.8rem; font-weight: 700; }
   .settings-hint { color: #999; font-size: 0.85rem; text-align: center; margin: 0 0 6px; }
   .settings-textarea {
     width: 100%;
@@ -1041,25 +996,12 @@
     </div>
   </div>
 
-  <!-- TELA 7: Editar perfil (dentro de Configurações > Ver perfil) -->
-  <div class="screen" id="screen-profile-edit">
-    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
-    <div class="settings-username-pill" id="settings-username-pill"></div>
-    <button class="photo-picker settings-avatar-big" id="settings-avatar-btn" onclick="document.getElementById('settings-avatar-input').click()"></button>
-    <input type="file" id="settings-avatar-input" accept="image/*" style="display:none" onchange="onSettingsAvatarSelected(event)" />
-    <h2 class="settings-heading">Editar perfil</h2>
-    <button class="settings-option-btn" onclick="document.getElementById('settings-avatar-input').click()">alterar foto do perfil</button>
-    <input class="field settings-option-btn" id="settings-username-input" placeholder="alterar usuario" autocomplete="off" />
-    <p class="error-text" id="settings-error"></p>
-    <button class="btn-green" onclick="saveSettings()">salva</button>
-  </div>
-
   <!-- TELA: Ver perfil (aberta ao tocar na foto/nome no topo da lista de contatos) -->
   <div class="screen" id="screen-profile-view">
     <button class="back-arrow" onclick="goTo('screen-main')">←</button>
     <h1>perfil</h1>
-    <button class="profile-view-pill" onclick="goTo('screen-profile-edit')" id="profile-view-username"></button>
-    <button class="profile-view-avatar" onclick="goTo('screen-profile-edit')" id="profile-view-avatar"></button>
+    <div class="profile-view-pill" id="profile-view-username"></div>
+    <div class="profile-view-avatar" id="profile-view-avatar"></div>
     <div class="profile-view-pill date-pill" id="profile-view-created"></div>
   </div>
 
@@ -1402,72 +1344,6 @@
         }
       } catch (err) {
         dateEl.textContent = '';
-      }
-    }
-
-    // ---------- Tela 7: Editar perfil ----------
-    let pendingSettingsAvatarDataUrl = null;
-
-    function openProfileEdit() {
-      pendingSettingsAvatarDataUrl = null;
-      document.getElementById('settings-username-pill').textContent = myUsername;
-      document.getElementById('settings-username-input').value = myUsername;
-      document.getElementById('settings-error').textContent = '';
-      renderAvatarInto(document.getElementById('settings-avatar-btn'), myUsername, myAvatar);
-      goTo('screen-profile-edit');
-    }
-
-    async function onSettingsAvatarSelected(event) {
-      const file = event.target.files[0];
-      event.target.value = '';
-      if (!file) return;
-      pendingSettingsAvatarDataUrl = await resizeImage(file, 300, 0.85);
-      renderAvatarInto(document.getElementById('settings-avatar-btn'), myUsername, pendingSettingsAvatarDataUrl);
-    }
-
-    async function saveSettings() {
-      const errorEl = document.getElementById('settings-error');
-      errorEl.textContent = '';
-      const newUsername = normalize(document.getElementById('settings-username-input').value);
-
-      if (!newUsername) {
-        errorEl.textContent = 'Digite um nome de usuário.';
-        return;
-      }
-
-      const body = { username: newUsername };
-      if (pendingSettingsAvatarDataUrl) body.avatar = pendingSettingsAvatarDataUrl;
-
-      try {
-        const res = await fetch('/api/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          errorEl.textContent = data.error || 'Não foi possível salvar.';
-          return;
-        }
-
-        const usernameChanged = data.username !== myUsername;
-        token = data.token;
-        myUsername = data.username;
-        myAvatar = data.avatar || null;
-        localStorage.setItem(STORAGE_TOKEN, token);
-        localStorage.setItem(STORAGE_USERNAME, myUsername);
-        if (myAvatar) localStorage.setItem(STORAGE_AVATAR, myAvatar);
-        else localStorage.removeItem(STORAGE_AVATAR);
-
-        renderTopbarProfile();
-        if (usernameChanged && socket) {
-          // Reconecta o socket usando o token novo (com o nome de usuário atualizado)
-          socket.disconnect();
-          connectSocket();
-        }
-        goTo('screen-main');
-      } catch (err) {
-        errorEl.textContent = 'Erro de conexão. Tente novamente.';
       }
     }
 
