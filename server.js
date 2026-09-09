@@ -91,6 +91,7 @@ async function initDb() {
       to_user TEXT NOT NULL,
       content TEXT NOT NULL,
       delivered INTEGER DEFAULT 0,
+      read INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -129,6 +130,7 @@ async function initDb() {
     `ALTER TABLE users ADD COLUMN avatar TEXT`,
     `ALTER TABLE user_settings ADD COLUMN note TEXT DEFAULT ''`,
     `ALTER TABLE user_settings ADD COLUMN pix_key TEXT DEFAULT ''`,
+    `ALTER TABLE messages ADD COLUMN read INTEGER DEFAULT 0`,
   ];
   for (const sql of alters) {
     try {
@@ -359,6 +361,7 @@ async function deliverMessage(from, to, content) {
     to_user: to,
     content,
     delivered: delivered ? 1 : 0,
+    read: 0,
   };
 
   if (delivered) {
@@ -419,6 +422,12 @@ io.on('connection', (socket) => {
       for (const msg of pending) {
         socket.emit('message', msg);
         await dbRun('UPDATE messages SET delivered = 1 WHERE id = ?', [msg.id]);
+        // Avisa quem mandou (se ainda estiver online) que a mensagem, antes com
+        // 1 pontinho (pessoa offline), agora foi entregue — vira 2 pontinhos.
+        const senderSocketId = onlineUsers.get(msg.from_user);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('messageDelivered', { id: msg.id, to: username });
+        }
       }
     } catch (err) {
       console.error('Erro ao entregar mensagens pendentes:', err);
@@ -426,10 +435,38 @@ io.on('connection', (socket) => {
   })();
 
   // Envio de mensagem pelo WebSocket
-  socket.on('sendMessage', ({ to, content }) => {
+  socket.on('sendMessage', ({ to, content, clientId }) => {
     const toNormalized = normalizeUsername(to);
     if (!toNormalized || !content) return;
-    deliverMessage(username, toNormalized, content).catch((err) => console.error('Erro ao entregar mensagem:', err));
+    deliverMessage(username, toNormalized, content)
+      .then((message) => {
+        // Confirma pra quem MANDOU a mensagem (só pro socket dele mesmo) que
+        // ela foi salva, com o id real e se já foi entregue (pessoa online) ou não.
+        if (message) socket.emit('messageSent', { ...message, clientId });
+      })
+      .catch((err) => console.error('Erro ao entregar mensagem:', err));
+  });
+
+  // Marca como lidas todas as mensagens que `from` mandou pra mim, e avisa
+  // `from` (se estiver online) que suas mensagens foram vistas — os pontinhos
+  // dele ficam verdes em tempo real.
+  socket.on('markRead', async ({ from }) => {
+    const otherUser = normalizeUsername(from);
+    if (!otherUser) return;
+    try {
+      const result = await dbRun(
+        'UPDATE messages SET read = 1 WHERE from_user = ? AND to_user = ? AND read = 0',
+        [otherUser, username]
+      );
+      if (result.changes > 0) {
+        const senderSocketId = onlineUsers.get(otherUser);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('messagesRead', { by: username });
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao marcar mensagens como lidas:', err);
+    }
   });
 
   socket.on('disconnect', () => {
