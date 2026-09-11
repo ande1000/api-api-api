@@ -400,15 +400,14 @@
     );
   }
   .settings-menu-item:nth-child(1) { font-size: 0.92rem; }
-  .settings-menu-item:nth-child(2) { font-size: 1rem; }
-  .settings-menu-item:nth-child(3) { font-size: 0.74rem; color: #EE4423; }
-  .settings-menu-item:nth-child(4) { font-size: 0.78rem; }
-  .settings-menu-item:nth-child(5) { font-size: 0.78rem; color: #EE4423; }
-  .settings-menu-item:nth-child(6) { font-size: 0.78rem; }
-  .settings-menu-item:nth-child(7) { font-size: 0.95rem; }
+  .settings-menu-item:nth-child(2) { font-size: 0.74rem; color: #EE4423; }
+  .settings-menu-item:nth-child(3) { font-size: 0.78rem; }
+  .settings-menu-item:nth-child(4) { font-size: 0.78rem; color: #EE4423; }
+  .settings-menu-item:nth-child(5) { font-size: 0.78rem; }
+  .settings-menu-item:nth-child(6) { font-size: 0.95rem; }
 
   /* ---------- Telas simples de configuração (boas-vindas, agendar, bloquear, sobre) ---------- */
-  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-note, #screen-pix, #screen-profile-view {
+  #screen-welcome-message, #screen-schedule, #screen-block-user, #screen-about, #screen-note, #screen-profile-view {
     background: var(--black);
     align-items: center;
     padding: 44px 24px 20px;
@@ -416,7 +415,7 @@
     position: relative;
     overflow-y: auto;
   }
-  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-note h1, #screen-pix h1, #screen-profile-view h1 {
+  #screen-welcome-message h1, #screen-schedule h1, #screen-block-user h1, #screen-about h1, #screen-note h1, #screen-profile-view h1 {
     color: var(--white);
     font-size: 1.2rem;
     font-weight: 800;
@@ -1011,7 +1010,6 @@
     <button class="back-arrow settings-menu-back" onclick="goTo('screen-main')">←</button>
     <div class="settings-menu-list">
       <button class="settings-menu-item" onclick="openNoteScreen()">bloco de nota</button>
-      <button class="settings-menu-item" onclick="openPixScreen()">AD.chave pix</button>
       <button class="settings-menu-item" onclick="openWelcomeMessageScreen()">MENSAGEM DE BOAS VINDAS</button>
       <button class="settings-menu-item" onclick="openScheduleScreen()">AGENDA MESAGEM</button>
       <button class="settings-menu-item" onclick="openBlockUserScreen()">BLOQUEAR USUARIO</button>
@@ -1031,15 +1029,6 @@
   </div>
 
   <!-- TELA 16: Chave pix -->
-  <div class="screen" id="screen-pix">
-    <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
-    <h1>Adicionar chave pix</h1>
-    <p class="settings-hint">Guarde sua chave pix aqui pra ter à mão quando precisar.</p>
-    <input class="field" id="pix-input" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off" />
-    <p class="error-text" id="pix-error"></p>
-    <button class="btn-green" onclick="savePix()">salvar</button>
-  </div>
-
   <!-- TELA 9: Mensagem de boas-vindas -->
   <div class="screen" id="screen-welcome-message">
     <button class="back-arrow" onclick="goTo('screen-settings-menu')">←</button>
@@ -1193,7 +1182,11 @@
 
     function goTo(screenId) {
       document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
-      document.getElementById(screenId).classList.add('active');
+      const target = document.getElementById(screenId);
+      target.classList.add('active');
+      // Segurança: sincroniza o fundo do body com o da tela atual, pra nunca
+      // aparecer uma faixa preta 'vazando' atrás em casos raros de redimensionamento.
+      document.body.style.background = getComputedStyle(target).backgroundColor;
       const emojiOverlay = document.getElementById('emoji-popup-overlay');
       if (emojiOverlay) emojiOverlay.classList.remove('active');
       const menuOverlay = document.getElementById('chat-menu-overlay');
@@ -1379,36 +1372,6 @@
     }
 
     // ---------- Tela 16: Chave pix ----------
-    async function openPixScreen() {
-      goTo('screen-pix');
-      document.getElementById('pix-error').textContent = '';
-      try {
-        const res = await fetch('/api/settings', { headers: { 'Authorization': 'Bearer ' + token } });
-        const data = await res.json();
-        document.getElementById('pix-input').value = data.pixKey || '';
-      } catch (err) { /* segue com o campo vazio se der erro */ }
-    }
-
-    async function savePix() {
-      const errorEl = document.getElementById('pix-error');
-      errorEl.textContent = '';
-      const pixKey = document.getElementById('pix-input').value.trim();
-      try {
-        const res = await fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ pixKey }),
-        });
-        if (!res.ok) {
-          errorEl.textContent = 'Não foi possível salvar.';
-          return;
-        }
-        goTo('screen-settings-menu');
-      } catch (err) {
-        errorEl.textContent = 'Erro de conexão. Tente novamente.';
-      }
-    }
-
     // ---------- Tela 9: Mensagem de boas-vindas ----------
     async function openWelcomeMessageScreen() {
       goTo('screen-welcome-message');
